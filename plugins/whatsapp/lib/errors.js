@@ -2,17 +2,22 @@ export class WhatsAppError extends Error {
   constructor(code, status = 400, extra = {}) {
     super(
       {
-        invalid_auth:
-          "WhatsApp rejected the credentials; reconnect this connection.",
-        token_revoked:
-          "WhatsApp access was revoked; reconnect this connection.",
-        token_expired:
-          "WhatsApp credentials expired; reconnect this connection.",
-        missing_scope:
-          "The WhatsApp app lacks a required user scope; update the app and reconnect.",
-        ratelimited:
-          "WhatsApp rate limit reached; retry after the indicated delay.",
-        reconnect_required: "Reconnect WhatsApp to obtain a new authorization.",
+        signin_required:
+          "Reconnect WhatsApp to restore the linked-device session.",
+        session_revoked:
+          "This WhatsApp device was revoked. Reconnect using your phone number.",
+        international_phone_number_required:
+          "Enter your phone number including its country code, without a leading zero.",
+        pairing_expired:
+          "The phone-pairing code expired. Start the connection again.",
+        pairing_failed:
+          "WhatsApp could not start phone pairing. Retry and confirm this number is signed in on your phone.",
+        account_mismatch:
+          "Use the WhatsApp account originally linked to this connection.",
+        poll_key_unavailable:
+          "This session does not have the original poll key. Vote using WhatsApp on your phone.",
+        helper_download_failed:
+          "The matching WhatsApp helper could not be downloaded. Retry or configure a local helper executable.",
         permission_denied:
           "This operation exceeds the connection access level.",
         uncertain:

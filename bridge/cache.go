@@ -15,7 +15,7 @@ import (
 )
 
 var chatRE = regexp.MustCompile(`^[0-9]+(?:-[0-9]+)?@(s\.whatsapp\.net|g\.us|lid)$`)
-var phoneRE = regexp.MustCompile(`^[0-9]{7,15}$`)
+var phoneRE = regexp.MustCompile(`^[1-9][0-9]{6,14}$`)
 var idRE = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 
 func parseChat(s string) (types.JID, error) {

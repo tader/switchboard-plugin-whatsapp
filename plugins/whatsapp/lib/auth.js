@@ -61,7 +61,7 @@ export function createAuth(pool) {
         const profile = connection?.credentials?.profile ?? randomUUID(),
           previous = connection?.credentials?.account;
         const phone = String(config.phone ?? "").replace(/^\+/, "");
-        if (!previous && !/^\d{7,15}$/.test(phone))
+        if (!previous && !/^[1-9]\d{6,14}$/.test(phone))
           throw fail("international_phone_number_required", 400);
         const start = () =>
           pool.call(profile, "start", {

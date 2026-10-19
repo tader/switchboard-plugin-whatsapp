@@ -190,7 +190,7 @@ func (a *app) start(ctx context.Context, in args) (any, error) {
 		reset()
 		return nil, bad("pairing_timeout", 503)
 	}
-	code, err := a.cli.PairPhone(ctx, in.Phone, false, whatsmeow.PairClientChrome, "Chrome (Switchboard)")
+	code, err := a.cli.PairPhone(ctx, in.Phone, false, whatsmeow.PairClientChrome, "Chrome (Linux)")
 	if err != nil {
 		a.cli.Disconnect()
 		reset()
