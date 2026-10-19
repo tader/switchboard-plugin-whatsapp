@@ -1,0 +1,62 @@
+name: Publish reviewed WhatsApp version
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: whatsapp-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: bridge/go.mod
+          cache-dependency-path: bridge/go.sum
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:bridge
+      - run: npm run build:bridge
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: tader/switchboard
+          ref: 55e538e6e20f6f16af20a632b02dc37825917149
+          path: switchboard-core
+      - run: npm ci --prefix switchboard-core
+      - run: npm run integration
+        env:
+          SWITCHBOARD_ROOT: ${{ github.workspace }}/switchboard-core
+      - name: Build portable helpers and notices
+        run: |
+          mkdir -p .local/release
+          for target in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            target_os=${target%-*}
+            target_arch=${target#*-}
+            (cd bridge && GOOS="$target_os" GOARCH="$target_arch" CGO_ENABLED=0 go build -trimpath -o "../.local/release/whatsapp-bridge-$target" .)
+          done
+          node scripts/licenses.js
+          tar -czf .local/release/third-party-notices.tar.gz -C .local/release licenses
+          (cd .local/release && sha256sum whatsapp-bridge-* third-party-notices.tar.gz > sha256sums.txt)
+      - name: Publish matching helper assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version=$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "Version v$version is already published."
+          else
+            gh release create "v$version" .local/release/whatsapp-bridge-* .local/release/sha256sums.txt .local/release/third-party-notices.tar.gz --target "$GITHUB_SHA" --title "WhatsApp v$version" --generate-notes
+          fi
