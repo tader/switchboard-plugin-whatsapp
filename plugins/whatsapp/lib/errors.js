@@ -16,6 +16,8 @@ export class WhatsAppError extends Error {
           "Use the WhatsApp account originally linked to this connection.",
         poll_key_unavailable:
           "This session does not have the original poll key. Vote using WhatsApp on your phone.",
+        helper_cache_unavailable:
+          "Switchboard cannot read or prepare its cached WhatsApp helper. Check that the helper files and plugin data directory are owned by the Switchboard service user.",
         helper_release_unavailable:
           "The matching WhatsApp helper release is not published yet. For a PR/development installation, configure a locally built WhatsApp helper executable in plugin settings.",
         helper_download_failed:

@@ -55,7 +55,10 @@ export async function ensureBinary(
       await fs.chmod(file, 0o700);
       return file;
     }
-  } catch {}
+  } catch (error) {
+    if (["EACCES", "EPERM", "EROFS", "ENOTDIR"].includes(error.code))
+      throw fail("helper_cache_unavailable", 503);
+  }
   const base = `https://github.com/tader/switchboard-plugin-whatsapp/releases/download/v${version}`;
   const get = async (url, max) =>
     bounded(

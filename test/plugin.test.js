@@ -553,3 +553,36 @@ test("unpublished helper release reports development setup rather than a retryab
     { code: "helper_download_failed" },
   );
 });
+
+test("an unreadable cached helper reports permissions instead of trying an unrelated download", async (t) => {
+  const dir = await fs.mkdtemp(
+    path.join(os.tmpdir(), "whatsapp-cache-permissions-"),
+  );
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const original = fs.readFile;
+  const mocked = t.mock.method(fs, "readFile", async (file, ...args) => {
+    if (String(file).endsWith(".sha256"))
+      throw Object.assign(new Error("Permission denied"), { code: "EACCES" });
+    return original(file, ...args);
+  });
+  let downloads = 0;
+  try {
+    await assert.rejects(
+      ensureBinary(
+        { settings: {}, manifest: { version: "1.0.0" }, dataDir: dir },
+        {
+          platform: "linux",
+          arch: "x64",
+          fetcher: async () => {
+            downloads++;
+            return new Response(null, { status: 404 });
+          },
+        },
+      ),
+      { code: "helper_cache_unavailable" },
+    );
+    assert.equal(downloads, 0);
+  } finally {
+    mocked.mock.restore();
+  }
+});
