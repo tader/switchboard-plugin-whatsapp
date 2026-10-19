@@ -531,3 +531,25 @@ test("revoked device reconnect restarts the helper in the same profile and prese
   assert.equal(result.account.id, account);
   assert.equal(f.calls.at(-1).args.expectedAccount, account);
 });
+
+test("unpublished helper release reports development setup rather than a retryable download failure", async (t) => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "whatsapp-unreleased-"));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const ctx = { settings: {}, manifest: { version: "1.0.0" }, dataDir: dir };
+  await assert.rejects(
+    ensureBinary(ctx, {
+      platform: "linux",
+      arch: "x64",
+      fetcher: async () => new Response(null, { status: 404 }),
+    }),
+    { code: "helper_release_unavailable" },
+  );
+  await assert.rejects(
+    ensureBinary(ctx, {
+      platform: "linux",
+      arch: "x64",
+      fetcher: async () => new Response(null, { status: 503 }),
+    }),
+    { code: "helper_download_failed" },
+  );
+});

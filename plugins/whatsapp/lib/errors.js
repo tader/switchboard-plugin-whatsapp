@@ -16,6 +16,8 @@ export class WhatsAppError extends Error {
           "Use the WhatsApp account originally linked to this connection.",
         poll_key_unavailable:
           "This session does not have the original poll key. Vote using WhatsApp on your phone.",
+        helper_release_unavailable:
+          "The matching WhatsApp helper release is not published yet. For a PR/development installation, configure a locally built WhatsApp helper executable in plugin settings.",
         helper_download_failed:
           "The matching WhatsApp helper could not be downloaded. Retry or configure a local helper executable.",
         permission_denied:

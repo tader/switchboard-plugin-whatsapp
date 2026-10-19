@@ -5,7 +5,12 @@ import { fail } from "./errors.js";
 export async function bounded(response, max) {
   if (!response.ok) {
     await response.body?.cancel();
-    throw fail("helper_download_failed", 503);
+    throw fail(
+      response.status === 404
+        ? "helper_release_unavailable"
+        : "helper_download_failed",
+      503,
+    );
   }
   const chunks = [];
   let n = 0;
