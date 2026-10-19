@@ -1,0 +1,17 @@
+{
+  "name": "switchboard-plugin-whatsapp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit && node scripts/check.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
+    "test:bridge": "cd bridge && go test -race ./...",
+    "build:bridge": "cd bridge && go build -trimpath -o ../.local/whatsapp-bridge .",
+    "integration": "node --disable-warning=ExperimentalWarning scripts/integration.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

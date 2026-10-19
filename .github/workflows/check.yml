@@ -1,0 +1,50 @@
+name: Check WhatsApp plugin
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: bridge/go.mod
+          cache-dependency-path: bridge/go.sum
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:bridge
+      - run: npm run build:bridge
+      - run: node scripts/licenses.js
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: tader/switchboard
+          ref: 55e538e6e20f6f16af20a632b02dc37825917149
+          path: switchboard-core
+      - run: npm ci --prefix switchboard-core
+      - run: npm run integration
+        env:
+          SWITCHBOARD_ROOT: ${{ github.workspace }}/switchboard-core
+  cross-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux, darwin]
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: bridge/go.mod
+          cache-dependency-path: bridge/go.sum
+      - run: go build -trimpath -o ../.local/whatsapp-bridge-${{ matrix.os }}-${{ matrix.arch }} .
+        working-directory: bridge
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
