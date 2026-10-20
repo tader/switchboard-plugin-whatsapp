@@ -5,6 +5,9 @@ import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { Bridge } from "../plugins/whatsapp/lib/bridge.js";
+const { version } = JSON.parse(
+  fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+);
 const root = process.env.SWITCHBOARD_ROOT;
 if (!root)
   throw Error(
@@ -34,14 +37,14 @@ const bytes = fs.readFileSync(archive),
 const helper = path.join(dir, "fixture-helper");
 fs.writeFileSync(
   helper,
-  `#!/usr/bin/env node\nconst fs=require('node:fs'),path=require('node:path'),readline=require('node:readline');const dir=process.argv[process.argv.indexOf('--data-dir')+1];let ready=fs.existsSync(path.join(dir,'active.json'));readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.parse(line);let result;if(r.method==='version')result={version:'1.0.0',protocol:1};else if(r.method==='start')result=ready?{ready:true,account:'123456789@s.whatsapp.net'}:{ready:false,code:'TEST-CODE'};else if(r.method==='status'){ready=true;result={ready:true,account:'123456789@s.whatsapp.net',historyCoverage:'synced_cache_only'};}else if(r.method==='chats')result={items:[{id:'987654321@s.whatsapp.net'}],nextCursor:'native-cursor',hasMore:true};else if(['send','react','vote'].includes(r.method))result={ok:true,messageId:r.args.sendId,chat:r.args.chat};else result={items:[],nextCursor:null,hasMore:false};process.stdout.write(JSON.stringify({id:r.id,result})+'\\n');});\n`,
+  `#!/usr/bin/env node\nconst fs=require('node:fs'),path=require('node:path'),readline=require('node:readline');const dir=process.argv[process.argv.indexOf('--data-dir')+1];let ready=fs.existsSync(path.join(dir,'active.json'));readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.parse(line);let result;if(r.method==='version')result={version:${JSON.stringify(version)},protocol:1};else if(r.method==='start')result=ready?{ready:true,account:'123456789@s.whatsapp.net'}:{ready:false,code:'TEST-CODE'};else if(r.method==='status'){ready=true;result={ready:true,account:'123456789@s.whatsapp.net',historyCoverage:'synced_cache_only'};}else if(r.method==='chats')result={items:[{id:'987654321@s.whatsapp.net'}],nextCursor:'native-cursor',hasMore:true};else if(['send','react','vote'].includes(r.method))result={ok:true,messageId:r.args.sendId,chat:r.args.chat};else result={items:[],nextCursor:null,hasMore:false};process.stdout.write(JSON.stringify({id:r.id,result})+'\\n');});\n`,
   { mode: 0o700 },
 );
 globalThis.fetch = async (input, opts = {}) => {
   const url = String(input);
   if (url.startsWith("https://api.github.com/repos/fixture/whatsapp/")) {
     if (url.includes("/releases")) {
-      const r = { tag_name: "v1.0.0", published_at: "2026-10-19T00:00:00Z" };
+      const r = { tag_name: `v${version}`, published_at: "2026-10-19T00:00:00Z" };
       return Response.json(url.endsWith("/latest") ? r : [r]);
     }
     if (url.includes("/commits/")) return new Response(sha);
@@ -58,7 +61,7 @@ try {
   );
   assert.deepEqual(await native.call("version"), {
     protocol: 1,
-    version: "1.0.0",
+    version,
   });
   assert.equal((await native.call("status")).ready, false);
   await native.close();
