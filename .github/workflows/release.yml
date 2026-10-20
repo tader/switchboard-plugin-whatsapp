@@ -14,8 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: "24"
@@ -60,3 +64,21 @@ jobs:
           else
             gh release create "v$version" .local/release/whatsapp-bridge-* .local/release/sha256sums.txt .local/release/third-party-notices.tar.gz --target "$GITHUB_SHA" --title "WhatsApp v$version" --generate-notes
           fi
+      - name: Mark published release PRs as tagged
+        # Version-only Release Please leaves this label pending. Clear it only
+        # after publication so a failed release can be retried and later PRs work.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version=$(node -p "JSON.parse(require('fs').readFileSync('package.json')).version")
+          gh pr list --state merged --base main --head release-please--branches--main--components--switchboard-plugin-whatsapp \
+            --label 'autorelease: pending' --json number,title,mergeCommit \
+            --jq ".[] | select(.title == \"chore(main): release $version\") | \"\(.number) \(.mergeCommit.oid)\"" |
+          while read -r number sha; do
+            git merge-base --is-ancestor "$sha" "$GITHUB_SHA"
+            gh label create 'autorelease: tagged' --color 1D76DB \
+              --description 'Release has been published' --force
+            gh pr edit "$number" --add-label 'autorelease: tagged' --remove-label 'autorelease: pending'
+          done
