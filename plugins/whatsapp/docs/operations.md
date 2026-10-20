@@ -30,7 +30,7 @@ Reads do not fetch an unbounded phone archive or mark anything read. To request 
 }
 ```
 
-Add `replyTo` with an exact cached message ID to quote it. The original sender and message content are taken from that chat's cache, rather than supplied by the caller. This version can quote untruncated text messages and polls; missing/restricted/media context fails explicitly.
+Add `replyTo` with an exact cached message ID to quote it. The original sender and message content are taken from that chat's cache, rather than supplied by the caller. This version can quote untruncated text messages and polls; missing/restricted/media context fails explicitly before sending. An empty `replyTo` is treated as omitted before idempotency checks, so empty and omitted forms of the same request share one receipt. Other invalid values, including whitespace and `null`, are rejected. Unsupported quoted replies never automatically fall back to an unquoted send: to send without the quote, omit `replyTo` and use a new idempotency key because the message has changed.
 
 ## Reactions and poll voting
 
