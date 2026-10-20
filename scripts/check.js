@@ -9,6 +9,13 @@ assert.equal(
   manifest.version,
   JSON.parse(fs.readFileSync("package.json", "utf8")).version,
 );
+const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+assert.equal(lock.version, manifest.version);
+assert.equal(lock.packages[""].version, manifest.version);
+assert.equal(
+  JSON.parse(fs.readFileSync(".release-please-manifest.json", "utf8"))["."],
+  manifest.version,
+);
 assert.equal(manifest.id, "whatsapp");
 assert.equal(new Set(operations.map((o) => o.id)).size, operations.length);
 for (const o of operations)

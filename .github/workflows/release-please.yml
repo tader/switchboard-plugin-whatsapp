@@ -1,0 +1,29 @@
+name: Release please
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # Reconcile after publication clears pending labels, including commits that
+  # arrived while the publisher was running. No PAT or bot-tag trigger is needed.
+  workflow_run:
+    workflows: [Publish reviewed WhatsApp version]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+jobs:
+  release-pr:
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      # The existing release workflow owns tagging and helper asset publication.
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-release: true
