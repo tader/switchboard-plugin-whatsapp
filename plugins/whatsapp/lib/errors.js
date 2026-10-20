@@ -14,6 +14,16 @@ export class WhatsAppError extends Error {
           "WhatsApp could not start phone pairing. Retry and confirm this number is signed in on your phone.",
         account_mismatch:
           "Use the WhatsApp account originally linked to this connection.",
+        invalid_input:
+          "Invalid request input. Check the operation's required fields, types and formats.",
+        reply_context_unavailable:
+          "This API can quote only complete cached text messages and polls. The requested quote context is unavailable. Nothing was sent. To send without a quote, omit replyTo and use a new idempotencyKey.",
+        message_not_in_synced_cache:
+          "This message is not in the connection's synced cache. Use an exact message ID from this chat's cached history, or request older history from your phone.",
+        send_uncertain:
+          "The send outcome is unknown and the message may have been delivered. Inspect GET /writes with the same idempotencyKey and check WhatsApp before any further send. Do not retry with a new key while the outcome is unknown.",
+        invalid_write_receipt:
+          "The send returned an invalid receipt and delivery is unknown. Inspect GET /writes with the same idempotencyKey and check WhatsApp before any further send.",
         poll_key_unavailable:
           "This session does not have the original poll key. Vote using WhatsApp on your phone.",
         helper_cache_unavailable:
@@ -25,9 +35,9 @@ export class WhatsAppError extends Error {
         permission_denied:
           "This operation exceeds the connection access level.",
         uncertain:
-          "The previous write outcome is unknown. Check WhatsApp before making another attempt.",
+          "The previous write outcome is unknown. Inspect GET /writes with the same idempotencyKey and check WhatsApp. Do not retry with a new key while the outcome is unknown.",
         idempotency_conflict:
-          "This idempotency key was used for different content.",
+          "This idempotency key was used for different content. Inspect its status with GET /writes before using a new key for an intentionally changed request.",
       }[code] ?? `WhatsApp operation failed (${code}).`,
     );
     this.code = code;

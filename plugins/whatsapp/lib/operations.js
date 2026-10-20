@@ -79,7 +79,15 @@ export const operations = [
     "/messages",
     "sendWhatsAppMessage",
     "Send text, optionally quoting a cached message",
-    { chat, text, replyTo: id, idempotencyKey: key },
+    {
+      chat,
+      text,
+      replyTo: str(
+        "Optional exact ID of a cached text message or poll to quote. Omit or use an empty string for an unquoted message. Unsupported quotes fail without sending; they never fall back automatically.",
+        { pattern: "^[A-Za-z0-9_-]{0,128}$" },
+      ),
+      idempotencyKey: key,
+    },
     ["chat", "text", "idempotencyKey"],
     true,
   ],

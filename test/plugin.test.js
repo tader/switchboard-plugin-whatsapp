@@ -19,7 +19,9 @@ async function fixture(t) {
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
   const calls = [];
   let ready = false,
-    mismatch = false;
+    mismatch = false,
+    writeError = null,
+    quoteType = "text";
   const pool = {
     profile: (id) => path.join(dir, "profiles", id),
     async call(id, method, args = {}) {
@@ -31,8 +33,10 @@ async function fixture(t) {
           account: mismatch ? "999999999@s.whatsapp.net" : account,
           code: "ABCD-EFGH",
         };
-      if (["send", "react", "vote"].includes(method))
+      if (["send", "react", "vote"].includes(method)) {
+        if (writeError) throw writeError;
         return { ok: true, messageId: args.sendId, chat: args.chat };
+      }
       if (method === "chats")
         return {
           items: [{ id: chat }],
@@ -46,7 +50,7 @@ async function fixture(t) {
           nextCursor: null,
           hasMore: false,
         };
-      if (method === "message") return { id: args.messageId, chat: args.chat };
+      if (method === "message") return { id: args.messageId, chat: args.chat, type: quoteType };
       if (method === "history") return { requested: true };
       throw Error("Unexpected method");
     },
@@ -99,6 +103,8 @@ async function fixture(t) {
     mismatch: () => {
       mismatch = true;
     },
+    failWrites: error => { writeError = error; },
+    quoteType: type => { quoteType = type; },
   };
 }
 test("phone-code flow caches identity and strips phone number from saved config", async (t) => {
@@ -585,4 +591,121 @@ test("an unreadable cached helper reports permissions instead of trying an unrel
   } finally {
     mocked.mock.restore();
   }
+});
+
+
+test("empty and omitted replyTo share one canonical send and durable receipt", async (t) => {
+  const f = await fixture(t);
+  for (const emptyFirst of [true, false]) {
+    const payload = { chat, text: "fixture text", idempotencyKey: `empty-reply-${emptyFirst}` };
+    const first = await f.request("POST", "/messages", { ...payload, ...(emptyFirst ? { replyTo: "" } : {}) });
+    assert.equal(first.status, 200);
+    assert.equal(Object.hasOwn(f.calls.at(-1).args, "replyTo"), false, "an empty replyTo never reaches the helper");
+    const repeat = await f.request("POST", "/messages", { ...payload, ...(!emptyFirst ? { replyTo: "" } : {}) });
+    assert.equal(repeat.status, 200);
+    assert.equal(repeat.data.replayed, true);
+    assert.equal(repeat.data.messageId, first.data.messageId);
+  }
+  assert.equal(f.calls.filter(c => c.method === "send").length, 2, "one mock send per distinct key");
+  const op = operations.find(op => op.id === "sendWhatsAppMessage");
+  assert.doesNotThrow(() => validate({ chat, text: "fixture", replyTo: "", idempotencyKey: "empty-schema" }, op.input));
+});
+
+test("invalid nonempty replyTo values explain the field and never reach a native send", async (t) => {
+  const f = await fixture(t);
+  for (const replyTo of [null, " ", "id with spaces", 123]) {
+    const result = await f.request("POST", "/messages", { chat, text: "fixture", replyTo, idempotencyKey: "invalid-reply" });
+    assert.equal(result.status, 400);
+    assert.equal(result.data.error.code, "invalid_input");
+    assert.match(result.data.error.message, /Invalid replyTo/);
+    assert.match(result.data.error.message, /Omit or use an empty string/);
+  }
+  assert.equal(f.calls.filter(c => c.method === "send").length, 0);
+});
+
+test("unsupported quoted media explains recovery and never automatically sends unquoted", async (t) => {
+  const f = await fixture(t);
+  for (const type of ["video", "image", "audio", "document", "sticker"]) {
+    f.quoteType(type);
+    f.failWrites(fail("reply_context_unavailable", 409, { definitive: true }));
+    const payload = { chat, text: "fixture text", replyTo: "CACHED", idempotencyKey: `media-reply-${type}` };
+    const result = await f.request("POST", "/messages", payload);
+    assert.equal(result.status, 409);
+    assert.equal(result.data.error.code, "reply_context_unavailable");
+    assert.match(result.data.error.message, new RegExp(`cannot reply to (?:a|an) ${type} message`));
+    assert.match(result.data.error.message, /Nothing was sent/);
+    assert.match(result.data.error.message, /omit replyTo and use a new idempotencyKey/);
+    const receipt = await f.request("GET", `/writes?idempotencyKey=${payload.idempotencyKey}`);
+    assert.equal(receipt.data.state, "rejected");
+    const changed = await f.request("POST", "/messages", { ...payload, replyTo: "" });
+    assert.equal(changed.status, 409);
+    assert.equal(changed.data.error.code, "idempotency_conflict", "normalization never overwrites a different existing payload");
+    assert.equal(f.calls.filter(c => c.method === "send" && c.args.idempotencyKey === payload.idempotencyKey).length, 1);
+  }
+});
+
+test("quote metadata failures preserve the actionable original rejection", async (t) => {
+  const f = await fixture(t);
+  f.failWrites(fail("reply_context_unavailable", 409, { definitive: true }));
+  const original = f.pool.call.bind(f.pool);
+  f.pool.call = async (id, method, args) => {
+    if (method === "message") throw Error("metadata unavailable");
+    return original(id, method, args);
+  };
+  const result = await f.request("POST", "/messages", { chat, text: "fixture", replyTo: "CACHED", idempotencyKey: "missing-metadata" });
+  assert.equal(result.status, 409);
+  assert.equal(result.data.error.code, "reply_context_unavailable");
+  assert.match(result.data.error.message, /complete cached text messages and polls/);
+  assert.match(result.data.error.message, /omit replyTo and use a new idempotencyKey/);
+  assert.equal(f.calls.filter(c => c.method === "send").length, 1);
+});
+
+test("uncertain sends retain the original key and never fall back or resend", async (t) => {
+  const f = await fixture(t);
+  f.failWrites(fail("send_uncertain", 502, { definitive: false }));
+  const payload = { chat, text: "fixture", replyTo: "CACHED", idempotencyKey: "uncertain-reply" };
+  const first = await f.request("POST", "/messages", payload);
+  assert.equal(first.status, 502);
+  assert.match(first.data.error.message, /may have been delivered/);
+  assert.match(first.data.error.message, /Do not retry with a new key/);
+  const repeat = await f.request("POST", "/messages", payload);
+  assert.equal(repeat.status, 409);
+  assert.equal(repeat.data.error.code, "uncertain");
+  const receipt = await f.request("GET", `/writes?idempotencyKey=${payload.idempotencyKey}`);
+  assert.equal(receipt.data.state, "attempted");
+  assert.equal(f.calls.filter(c => c.method === "send").length, 1);
+  assert.equal(f.calls.filter(c => c.method === "message").length, 0);
+});
+
+
+test("slow quote diagnostics do not delay rejection or leave an attempted write", async (t) => {
+  const f = await fixture(t);
+  f.failWrites(fail("reply_context_unavailable", 409, { definitive: true }));
+  const original = f.pool.call.bind(f.pool);
+  let metadataStarted;
+  const started = new Promise(resolve => { metadataStarted = resolve; });
+  f.pool.call = async (id, method, args) => {
+    if (method === "message") { metadataStarted(); return new Promise(() => {}); }
+    return original(id, method, args);
+  };
+  const pending = f.request("POST", "/messages", { chat, text: "fixture", replyTo: "CACHED", idempotencyKey: "slow-diagnostics" });
+  await started;
+  const receipt = await f.request("GET", "/writes?idempotencyKey=slow-diagnostics");
+  assert.equal(receipt.data.state, "rejected", "persist rejection before optional diagnostics");
+  const result = await pending;
+  assert.equal(result.status, 409);
+  assert.match(result.data.error.message, /omit replyTo/);
+  assert.equal(f.calls.filter(c => c.method === "send").length, 1);
+});
+
+test("missing cached quote explains recovery without suggesting a send already happened", async (t) => {
+  const f = await fixture(t);
+  f.failWrites(fail("message_not_in_synced_cache", 404, { definitive: true }));
+  const result = await f.request("POST", "/messages", { chat, text: "fixture", replyTo: "MISSING", idempotencyKey: "missing-quote-id" });
+  assert.equal(result.status, 404);
+  assert.equal(result.data.error.code, "message_not_in_synced_cache");
+  assert.match(result.data.error.message, /quoted message is not in this connection's synced cache/);
+  assert.match(result.data.error.message, /Nothing was sent/);
+  assert.match(result.data.error.message, /new idempotencyKey/);
+  assert.equal(f.calls.filter(c => c.method === "send").length, 1);
 });

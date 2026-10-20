@@ -16,7 +16,7 @@ export function validate(value, schema, query = false) {
           ? s.default === undefined
             ? []
             : [[k, s.default]]
-          : [[k, validate(value[k], s, query)]],
+          : [[k, validateField(k, value[k], s, query)]],
       ),
     );
   }
@@ -59,4 +59,16 @@ export function validate(value, schema, query = false) {
   if (schema.type === "boolean" && typeof value !== "boolean")
     throw fail("invalid_input");
   return value;
+}
+
+function validateField(name, value, schema, query) {
+  try {
+    return validate(value, schema, query);
+  } catch (error) {
+    if (error.code === "invalid_input" && !error.field) {
+      error.field = name;
+      error.message = `Invalid ${name}. ${schema.description ?? "Check the required type and format."}`;
+    }
+    throw error;
+  }
 }
