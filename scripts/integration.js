@@ -37,7 +37,7 @@ const bytes = fs.readFileSync(archive),
 const helper = path.join(dir, "fixture-helper");
 fs.writeFileSync(
   helper,
-  `#!/usr/bin/env node\nconst fs=require('node:fs'),path=require('node:path'),readline=require('node:readline');const dir=process.argv[process.argv.indexOf('--data-dir')+1];let ready=fs.existsSync(path.join(dir,'active.json'));readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.parse(line);let result;if(r.method==='version')result={version:${JSON.stringify(version)},protocol:1};else if(r.method==='start')result=ready?{ready:true,account:'123456789@s.whatsapp.net'}:{ready:false,code:'TEST-CODE'};else if(r.method==='status'){ready=true;result={ready:true,account:'123456789@s.whatsapp.net',historyCoverage:'synced_cache_only'};}else if(r.method==='chats')result={items:[{id:'987654321@s.whatsapp.net'}],nextCursor:'native-cursor',hasMore:true};else if(['send','react','vote'].includes(r.method))result={ok:true,messageId:r.args.sendId,chat:r.args.chat};else result={items:[],nextCursor:null,hasMore:false};process.stdout.write(JSON.stringify({id:r.id,result})+'\\n');});\n`,
+  `#!/usr/bin/env node\nconst fs=require('node:fs'),path=require('node:path'),readline=require('node:readline');const dir=process.argv[process.argv.indexOf('--data-dir')+1];let ready=fs.existsSync(path.join(dir,'active.json')),mode='phone',polls=0;readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.parse(line);let result;if(r.method==='version')result={version:${JSON.stringify(version)},protocol:1};else if(r.method==='start'){mode=r.args.pairingMode||mode;result=ready?{ready:true,account:'123456789@s.whatsapp.net'}:mode==='qr'?{ready:false,qrCode:'fixture-first-qr',qrExpiresAt:Date.now()+60000}:{ready:false,code:'TEST-CODE'};}else if(r.method==='pairingStatus'&&mode==='qr'&&polls++===0){result={ready:false,qrCode:'fixture-rotated-qr',qrExpiresAt:Date.now()+20000};}else if(r.method==='pairingStatus'||r.method==='status'){ready=true;result={ready:true,account:'123456789@s.whatsapp.net',historyCoverage:'synced_cache_only'};}else if(r.method==='chats')result={items:[{id:'987654321@s.whatsapp.net'}],nextCursor:'native-cursor',hasMore:true};else if(['send','react','vote'].includes(r.method))result={ok:true,messageId:r.args.sendId,chat:r.args.chat};else result={items:[],nextCursor:null,hasMore:false};process.stdout.write(JSON.stringify({id:r.id,result})+'\\n');});\n`,
   { mode: 0o700 },
 );
 globalThis.fetch = async (input, opts = {}) => {
@@ -93,6 +93,19 @@ try {
   const connected = await connections.pollDevice(flow.flowId, user);
   assert.equal(connected.status, "connected");
   const connection = connected.connection;
+  const qr = await connections.startConnect(user, { service: "whatsapp", config: { access: "read" } });
+  assert.equal(qr.status, "device");
+  assert.equal(qr.device.qrCode, "fixture-first-qr");
+  assert.equal(qr.device.userCode, undefined);
+  const rotated = await connections.pollDevice(qr.flowId, user);
+  assert.equal(rotated.status, "pending");
+  assert.equal(rotated.device.qrCode, "fixture-rotated-qr");
+  assert.ok(rotated.device.qrExpiresAt > Date.now());
+  const qrConnected = await connections.pollDevice(qr.flowId, user);
+  assert.equal(qrConnected.status, "connected");
+  assert.equal(qrConnected.connection.methodId, "linked-device-qr");
+  await connections.deleteConnection(user.id, qrConnected.connection.id);
+
   const { execute } = await load("server/proxy.ts");
   let r = await execute(user, connection.id, { method: "GET", url: "/" });
   assert.equal(r.response.status, 200);
@@ -144,7 +157,7 @@ try {
   r = await send();
   assert.equal((await r.response.json()).replayed, true);
   console.log(
-    "PASS: actual helper offline startup, GitHub installer, plugin manager, phone-code flow, scoped proxy, API discovery, encrypted connection storage, durable receipts and restart; fixture account only",
+    "PASS: actual helper offline startup, GitHub installer, plugin manager, phone-code flow, default QR linking and rotation, scoped proxy, API discovery, encrypted connection storage, durable receipts and restart; fixture account only",
   );
 } finally {
   await native?.close();

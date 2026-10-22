@@ -5,13 +5,14 @@ export class WhatsAppError extends Error {
         signin_required:
           "Reconnect WhatsApp to restore the linked-device session.",
         session_revoked:
-          "This WhatsApp device was revoked. Reconnect using your phone number.",
+          "This WhatsApp device was revoked. Reconnect by scanning a QR code or using a phone code.",
+        core_upgrade_required: "Upgrade Switchboard to enable QR linking.",
         international_phone_number_required:
           "Enter your phone number including its country code, without a leading zero.",
         pairing_expired:
-          "The phone-pairing code expired. Start the connection again.",
+          "WhatsApp pairing expired. Start the connection again.",
         pairing_failed:
-          "WhatsApp could not start phone pairing. Retry and confirm this number is signed in on your phone.",
+          "WhatsApp could not start pairing. Retry and confirm WhatsApp is available on your phone.",
         account_mismatch:
           "Use the WhatsApp account originally linked to this connection.",
         invalid_input:

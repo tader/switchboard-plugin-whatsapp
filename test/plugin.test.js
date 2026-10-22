@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { createAuth } from "../plugins/whatsapp/lib/auth.js";
 import { createAdapter } from "../plugins/whatsapp/lib/adapter.js";
 import { operations } from "../plugins/whatsapp/lib/operations.js";
 import { validate } from "../plugins/whatsapp/lib/validate.js";
@@ -21,17 +22,21 @@ async function fixture(t) {
   let ready = false,
     mismatch = false,
     writeError = null,
-    quoteType = "text";
+    quoteType = "text",
+    qrCode = "fixture-first-qr",
+    qrExpiresAt = Date.now() + 60000,
+    pairingError;
   const pool = {
     profile: (id) => path.join(dir, "profiles", id),
     async call(id, method, args = {}) {
       calls.push({ id, method, args });
       await fs.mkdir(this.profile(id), { recursive: true, mode: 0o700 });
-      if (method === "start" || method === "status")
+      if (method === "start" || method === "status" || method === "pairingStatus")
         return {
           ready,
           account: mismatch ? "999999999@s.whatsapp.net" : account,
           code: "ABCD-EFGH",
+          qrCode, qrExpiresAt, pairingError,
         };
       if (["send", "react", "vote"].includes(method)) {
         if (writeError) throw writeError;
@@ -55,18 +60,19 @@ async function fixture(t) {
       throw Error("Unexpected method");
     },
     async close() {},
-    async drop() {},
+    async drop(id) { calls.push({ id, method: "drop" }); },
     async restore() {},
   };
   const ctx = {
     manifest: { version: "1.0.0" },
     settings: {},
+    capabilities: { deviceQr: true, deviceUpdates: true },
     dataDir: dir,
     log: { warn() {} },
   };
   const instance = await createAdapter(ctx, { pool });
   t.after(() => instance.dispose());
-  const auth = instance.services[0].authMethods[0];
+  const auth = instance.services[0].authMethods.find(method => method.id === "linked-device");
   const conn = {
     methodId: auth.id,
     credentials: { profile, account },
@@ -95,6 +101,10 @@ async function fixture(t) {
     pool,
     calls,
     auth,
+    methods: instance.services[0].authMethods,
+    qrAuth: instance.services[0].authMethods[0],
+    rotate: () => { qrCode = "fixture-rotated-qr"; qrExpiresAt = Date.now() + 20000; },
+    pairingFailure: code => { pairingError = code; },
     conn,
     request,
     ready: () => {
@@ -708,4 +718,69 @@ test("missing cached quote explains recovery without suggesting a send already h
   assert.match(result.data.error.message, /Nothing was sent/);
   assert.match(result.data.error.message, /new idempotencyKey/);
   assert.equal(f.calls.filter(c => c.method === "send").length, 1);
+});
+
+test("QR is the default method, needs no phone number, rotates and stores only account credentials", async t => {
+  const f = await fixture(t);
+  const auth = f.qrAuth;
+  assert.equal(auth.id, "linked-device-qr");
+  assert.equal(f.methods[1].id, "linked-device");
+  const flow = await auth.connect({ config: { access: "read" } });
+  assert.equal(flow.device.qrCode, "fixture-first-qr");
+  assert.equal(flow.device.userCode, undefined);
+  assert.ok(flow.device.qrExpiresAt > Date.now());
+  assert.equal(f.calls.at(-1).args.pairingMode, "qr");
+  assert.equal(f.calls.at(-1).args.phone, undefined);
+  assert.deepEqual(await auth.poll({ pending: flow.pending }), { wait: true });
+  f.rotate();
+  const update = await auth.poll({ pending: flow.pending });
+  assert.equal(update.wait, true);
+  assert.equal(update.device.qrCode, "fixture-rotated-qr");
+  f.ready();
+  const result = await auth.poll({ pending: flow.pending });
+  assert.deepEqual(result.config, { access: "read" });
+  assert.deepEqual(Object.keys(result.credentials).sort(), ["account", "profile"]);
+  assert.equal(result.credentials.account, account);
+  assert.equal((await auth.connect({ config: {}, connection: { credentials: result.credentials } })).account.id, account);
+});
+
+test("QR reconnect restarts revoked sessions and retains the original account binding", async t => {
+  const f = await fixture(t);
+  const original = f.pool.call.bind(f.pool);
+  let revoked = true, restarts = 0;
+  f.pool.call = async (id, method, args) => {
+    if (revoked && method === "start") { revoked = false; throw fail("session_revoked", 401); }
+    return original(id, method, args);
+  };
+  f.pool.restart = async id => { assert.equal(id, profile); restarts++; };
+  const flow = await f.qrAuth.connect({ connection: f.conn, config: { access: "write" } });
+  assert.equal(restarts, 1);
+  assert.equal(f.calls.at(-1).args.expectedAccount, account);
+  assert.equal(flow.device.qrCode, "fixture-first-qr");
+  f.ready(); f.mismatch();
+  await assert.rejects(f.qrAuth.poll({ pending: flow.pending }), { code: "account_mismatch" });
+});
+
+test("QR terminal errors clean up new profiles and older cores retain phone-code linking", async t => {
+  const f = await fixture(t);
+  const flow = await f.qrAuth.connect({ config: {} });
+  f.pairingFailure("pairing_expired");
+  await assert.rejects(f.qrAuth.poll({ pending: flow.pending }), { code: "pairing_expired" });
+  assert.equal(f.calls.at(-1).method, "drop");
+  const old = createAuth(f.pool);
+  try {
+    assert.match(old.methods[0].unavailable, /Upgrade Switchboard/);
+    assert.equal(old.methods[1].unavailable, undefined);
+    await assert.rejects(old.methods[0].connect({ config: {} }), { code: "core_upgrade_required" });
+  } finally { await old.dispose(); }
+});
+
+test("disposing pending QR attempts removes fresh profiles while preserving reconnect profiles", async t => {
+  const f = await fixture(t);
+  const auth = createAuth(f.pool, f.ctx.capabilities);
+  await auth.methods[0].connect({ config: {} });
+  const fresh = f.calls.at(-1).id;
+  await auth.methods[0].connect({ config: {}, connection: f.conn });
+  await auth.dispose();
+  assert.deepEqual(f.calls.filter(call => call.method === "drop").map(call => call.id), [fresh]);
 });

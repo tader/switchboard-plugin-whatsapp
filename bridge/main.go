@@ -20,7 +20,6 @@ import (
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
-	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
@@ -49,6 +48,7 @@ type response struct {
 	Error  *fault `json:"error,omitempty"`
 }
 type args struct {
+	PairingMode     string   `json:"pairingMode"`
 	Phone           string   `json:"phone"`
 	ExpectedAccount string   `json:"expectedAccount"`
 	Chat            string   `json:"chat"`
@@ -69,6 +69,7 @@ type app struct {
 	cli         *whatsmeow.Client
 	db          *sql.DB
 	mu          sync.Mutex
+	pairing     *pairingState
 	started     bool
 	account     string
 	syncAt      int64
@@ -133,76 +134,6 @@ func (a *app) status() map[string]any {
 	defer a.mu.Unlock()
 	return map[string]any{"ready": a.cli.IsConnected() && a.cli.IsLoggedIn(), "paired": account != "", "account": account, "historyCoverage": "synced_cache_only", "lastHistorySync": a.syncAt, "historySyncBatches": a.syncBatches, "cacheHealthy": !a.cacheFailed}
 }
-func (a *app) start(ctx context.Context, in args) (any, error) {
-	if a.cli.Store.Deleted {
-		return nil, bad("session_revoked", 401)
-	}
-	if a.cli.Store.ID != nil && in.ExpectedAccount != "" && a.cli.Store.ID.ToNonAD().String() != in.ExpectedAccount {
-		return nil, bad("account_mismatch", 403)
-	}
-	if a.cli.IsConnected() {
-		return a.status(), nil
-	}
-	a.mu.Lock()
-	started := a.started
-	if !started {
-		a.started = true
-	}
-	a.mu.Unlock()
-	if started {
-		return a.status(), nil
-	}
-	reset := func() { a.mu.Lock(); a.started = false; a.mu.Unlock() }
-	if a.cli.Store.ID != nil {
-		if err := a.cli.Connect(); err != nil {
-			reset()
-			return nil, bad("connection_failed", 503)
-		}
-		return a.status(), nil
-	}
-	if !phoneRE.MatchString(in.Phone) {
-		reset()
-		return nil, bad("international_phone_number_required", 400)
-	}
-	a.cli.PrePairCallback = func(jid types.JID, platform, businessName string) bool {
-		expected := in.ExpectedAccount
-		if expected == "" {
-			expected = in.Phone + "@s.whatsapp.net"
-		}
-		return jid.ToNonAD().String() == expected
-	}
-	qr, err := a.cli.GetQRChannel(context.Background())
-	if err != nil {
-		reset()
-		return nil, bad("pairing_failed", 503)
-	}
-	if err = a.cli.Connect(); err != nil {
-		reset()
-		return nil, bad("connection_failed", 503)
-	}
-	select {
-	case item := <-qr:
-		if item.Event != "code" {
-			reset()
-			return nil, bad("pairing_failed", 503)
-		}
-	case <-ctx.Done():
-		reset()
-		return nil, bad("pairing_timeout", 503)
-	}
-	code, err := a.cli.PairPhone(ctx, in.Phone, false, whatsmeow.PairClientChrome, "Chrome (Linux)")
-	if err != nil {
-		a.cli.Disconnect()
-		reset()
-		return nil, bad("pairing_failed", 503)
-	}
-	// Drain QR rotation events without logging authentication material.
-	go func() {
-		for range qr {
-		}
-	}()
-	return map[string]any{"ready": false, "code": code}, nil
-}
 func (a *app) event(evt any) {
 	switch e := evt.(type) {
 	case *events.Message:
@@ -249,6 +180,9 @@ func (a *app) dispatch(ctx context.Context, method string, in args) (any, error)
 	}
 	if method == "start" {
 		return a.start(ctx, in)
+	}
+	if method == "pairingStatus" {
+		return a.pairingStatus(), nil
 	}
 	if method == "status" {
 		return a.status(), nil

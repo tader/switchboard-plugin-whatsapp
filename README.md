@@ -6,7 +6,9 @@ WhatsApp direct and group chats for [Switchboard](https://github.com/tader/switc
 
 Install `tader/switchboard-plugin-whatsapp`, folder `plugins/whatsapp`. Stable installation requires a published release; before the first release, build the helper locally and configure its absolute path in **Plugins → WhatsApp → Settings → WhatsApp helper executable**.
 
-Add a **WhatsApp** connection, enter your own phone number in international format and choose read-only or read/write access. Switchboard displays a pairing code. On your phone, open **WhatsApp → Linked devices → Link a device → Link with phone number instead** and enter that code. The short-lived code must be used promptly. Subsequent starts reuse the saved linked-device session without another pairing.
+Add a **WhatsApp** connection and choose read-only or read/write access. QR linking is the default: on your phone, open **WhatsApp → Linked devices → Link a device** and scan the QR displayed by Switchboard. The QR refreshes automatically as WhatsApp rotates it; no phone number is required.
+
+Alternatively, choose **Link WhatsApp with a phone code**, enter your own phone number in international format, then select **Link with phone number instead** on your phone and enter the displayed code. Existing connections retain this method. Pairing expires after approximately 150 seconds; subsequent starts reuse the saved session. QR linking requires a Switchboard version supporting changing QR displays; older cores retain phone-code linking.
 
 The plugin manages its own helper process. Releases provide checksum-verified binaries for macOS and Linux on ARM64 and AMD64. Node 24 or newer is required; there are no runtime npm dependencies. See the [setup and recovery guide](plugins/whatsapp/docs/setup.md).
 
