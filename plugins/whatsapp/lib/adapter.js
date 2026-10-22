@@ -7,7 +7,7 @@ import { operations, openapi } from "./operations.js";
 import { fail, publicError } from "./errors.js";
 import { validate } from "./validate.js";
 export async function createAdapter(ctx, { pool = new Pool(ctx) } = {}) {
-  const auth = createAuth(pool),
+  const auth = createAuth(pool, ctx.capabilities),
     service = new Service(ctx, pool),
     invocations = new Map();
   let closed = false;
@@ -106,7 +106,7 @@ export async function createAdapter(ctx, { pool = new Pool(ctx) } = {}) {
     });
   } catch (e) {
     clearInterval(timer);
-    auth.dispose();
+    await auth.dispose();
     await pool.close();
     service.dispose();
     throw e;
@@ -123,9 +123,8 @@ export async function createAdapter(ctx, { pool = new Pool(ctx) } = {}) {
         baseUrl: "http://whatsapp.localhost",
         allowedHosts: ["whatsapp.localhost", origin.host],
         openapi,
-        authMethods: [
-          {
-            ...auth.method,
+        authMethods: auth.methods.map(method => ({
+            ...method,
             async authorize(req, conn, opts = {}) {
               if (closed) throw fail("plugin_unavailable", 503);
               if (
@@ -151,13 +150,12 @@ export async function createAdapter(ctx, { pool = new Pool(ctx) } = {}) {
               req.headers.set("authorization", `Bearer ${key}`);
               if (credentials !== conn.credentials) return { credentials };
             },
-          },
-        ],
+          })),
       },
     ],
     async dispose() {
       closed = true;
-      auth.dispose();
+      await auth.dispose();
       clearInterval(timer);
       invocations.clear();
       const drained = new Promise((resolve) => {
