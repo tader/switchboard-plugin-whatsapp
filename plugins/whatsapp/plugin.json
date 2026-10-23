@@ -1,7 +1,7 @@
 {
   "id": "whatsapp",
   "name": "WhatsApp",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "WhatsApp linked-device chats, message history, sending, quoted replies, reactions and poll votes.",
   "icon": "icon.svg",
   "settings": [
