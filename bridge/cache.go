@@ -11,7 +11,6 @@ import (
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
-	"google.golang.org/protobuf/proto"
 )
 
 var chatRE = regexp.MustCompile(`^[0-9]+(?:-[0-9]+)?@(s\.whatsapp\.net|g\.us|lid)$`)
@@ -118,14 +117,17 @@ func normalize(e *events.Message) (message, error) {
 	m.Text = trimText(m.Text)
 	m.Truncated = original != m.Text
 	// Only text and polls need protobuf context for quoting/voting. Media keys are not archived.
-	if m.Type == "text" || m.Type == "poll" {
-		m.raw, _ = proto.Marshal(p)
+	if !m.Truncated && (m.Type == "text" || m.Type == "poll") {
+		m.raw = safeQuote(p, m.Type)
 	}
 	return m, nil
 }
 func (a *app) initCache() error {
 	_, err := a.db.Exec(`CREATE TABLE IF NOT EXISTS sb_chats(chat TEXT PRIMARY KEY,name TEXT NOT NULL DEFAULT '',ts INTEGER NOT NULL DEFAULT 0);CREATE TABLE IF NOT EXISTS sb_messages(chat TEXT NOT NULL,id TEXT NOT NULL,sender TEXT NOT NULL,from_me INTEGER NOT NULL,ts INTEGER NOT NULL,text TEXT NOT NULL,kind TEXT NOT NULL,reply_to TEXT NOT NULL,poll TEXT NOT NULL,truncated INTEGER NOT NULL,raw BLOB,revision INTEGER NOT NULL,PRIMARY KEY(chat,id));CREATE INDEX IF NOT EXISTS sb_message_page ON sb_messages(chat,ts DESC,id DESC);CREATE TABLE IF NOT EXISTS sb_meta(key TEXT PRIMARY KEY,value INTEGER);`)
-	return err
+	if err != nil {
+		return err
+	}
+	return a.scrubQuoteCache()
 }
 func (a *app) ingest(e *events.Message) error {
 	m, err := normalize(e)
