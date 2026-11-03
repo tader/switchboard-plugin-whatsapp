@@ -56,14 +56,18 @@ export class MessagingCursors {
   async encode(binding, cursor) {
     if (typeof cursor !== "string" || cursor.length > 20000)
       throw fail("invalid_response", 502);
-    const value = Buffer.from(JSON.stringify([binding, cursor])).toString(
+    const key = await this.key();
+    const scope = createHmac("sha256", key)
+      .update("binding:" + JSON.stringify(binding))
+      .digest("base64url");
+    const value = Buffer.from(JSON.stringify([scope, cursor])).toString(
       "base64url",
     );
     return (
       value +
       "." +
-      createHmac("sha256", await this.key())
-        .update(value)
+      createHmac("sha256", key)
+        .update("cursor:" + value)
         .digest("base64url")
     );
   }
@@ -72,9 +76,10 @@ export class MessagingCursors {
       if (typeof token !== "string" || token.length > 30000) throw Error();
       const [value, mac, extra] = token.split(".");
       if (!value || !mac || extra !== undefined) throw Error();
+      const key = await this.key();
       const supplied = Buffer.from(mac, "base64url"),
-        expected = createHmac("sha256", await this.key())
-          .update(value)
+        expected = createHmac("sha256", key)
+          .update("cursor:" + value)
           .digest();
       if (
         supplied.length !== expected.length ||
@@ -85,7 +90,10 @@ export class MessagingCursors {
         Buffer.from(value, "base64url").toString(),
       );
       if (
-        JSON.stringify(bound) !== JSON.stringify(binding) ||
+        bound !==
+          createHmac("sha256", key)
+            .update("binding:" + JSON.stringify(binding))
+            .digest("base64url") ||
         typeof cursor !== "string"
       )
         throw Error();

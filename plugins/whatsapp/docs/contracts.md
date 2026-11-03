@@ -22,7 +22,8 @@ phone for older history automatically.
 
 All resources belong to the selected connection/account. Ids are opaque; clients
 must retain the connection alongside each id. Signed page cursors additionally bind
-the connection, account, profile, query and page limit. Their private signing key
+the connection, account, profile, query and page limit. Binding digests do not serialize private profile/account credential references into
+the cursor. Their private signing key
 survives restart. Cached chat/message pages always report partial coverage, including
 the final page. A cache miss is not a global deletion. Phone-number and LID aliases
 are not merged. Hidden/restricted/deleted and truncated bodies are not represented

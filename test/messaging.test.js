@@ -83,6 +83,12 @@ test("signed cursors bind connection/account/chat/limit and unsupported thread f
     name = "messaging.messages.list";
   const page = await invoke(f, name, { conversationId: chat, limit: 1 });
   assert.ok(page.nextCursor);
+  const decoded = Buffer.from(
+    page.nextCursor.split(".")[0],
+    "base64url",
+  ).toString();
+  assert.ok(!decoded.includes(f.connection.credentials.profile));
+  assert.ok(!decoded.includes(f.connection.credentials.account));
   f.service.contracts = createMessaging(f.dir, f.pool, {
     ready: () => Promise.resolve(),
   });
