@@ -18,6 +18,7 @@ The plugin manages its own helper process. Releases provide checksum-verified bi
 | ------------------------- | --------------------------------------------------------------- |
 | `getWhatsAppStatus`       | Connection state and partial history-sync coverage              |
 | `getWhatsAppCapabilities` | Supported features and selected access level                    |
+| `getWhatsAppChat`        | One exact synced direct/group chat                             |
 | `listWhatsAppChats`       | Paginated synced direct/group chats                             |
 | `listWhatsAppMessages`    | Paginated cached messages without marking read                  |
 | `getWhatsAppMessage`      | Message details, quote context and poll options                 |
@@ -37,6 +38,14 @@ Run on your laptop or pair directly on a remote Switchboard. To access a laptop-
 
 This is an unofficial linked-device integration, subject to WhatsApp protocol changes and account policies. Disconnect it from the phone's Linked devices screen when you want to revoke the linked device.
 
+## Shared Messaging contract (staged)
+
+The optional provider-independent Messaging v1 API and durable native change feed
+are documented in [the contract guide](plugins/whatsapp/docs/contracts.md). They
+require the staged core from [Switchboard #40](https://github.com/tader/switchboard/pull/40)
+and the helper built from this revision. Existing APIs remain available. The core
+feature remains disabled by default; no live account is used in conformance tests.
+
 ## Development
 
 ```sh
@@ -46,10 +55,11 @@ npm test
 npm run test:bridge
 npm run build:bridge
 SWITCHBOARD_ROOT=/path/to/switchboard npm run integration
+SWITCHBOARD_ROOT=/path/to/staged-contract-core npm run integration:contracts
 ```
 
 Go 1.27.2 builds the helper with pure-Go SQLite. `npm run build:bridge` writes `.local/whatsapp-bridge`; set the plugin's helper path to that absolute file when developing. Native tests use a temporary local device store and real poll encryption without connecting to WhatsApp. The integration suite exercises the actual Switchboard installer, plugin manager, pairing flow, proxy, discovery, persistence and restart with a fixture account, plus offline startup of the real helper. Live pairing and message delivery have not been validated.
 
-Release Please opens a version/changelog PR after releasable conventional commits reach `main`. It updates the package, lockfile, plugin manifest and helper version together. Review and merge that PR; its push to `main` triggers the existing release workflow, which tests the code, cross-builds four helper binaries and publishes them with `sha256sums.txt` under `v<version>`. Release Please itself does not publish releases. After successful publication, the publisher marks the release PR as tagged so future release PRs can proceed. Failed publication leaves it pending; rerun the publishing workflow after resolving the failure. Repository Actions settings must allow GitHub Actions to create pull requests. The workflows use the built-in `GITHUB_TOKEN`; merging a release PR is the trigger, rather than a bot-created tag.
+Release Please opens a version/changelog PR after releasable conventional commits reach `main`. It updates the package, lockfile, plugin manifest and helper version together. Review and merge that PR; its push to `main` triggers the existing release workflow, which tests the code, cross-builds four helper binaries and publishes them with `sha256sums.txt` under `v<version>`. Release Please itself does not publish releases. Bot-created release PRs receive the required checks through an explicit workflow dispatch that verifies the expected head revision before testing. After successful publication, the publisher marks the release PR as tagged so future release PRs can proceed. Failed publication leaves it pending; rerun the publishing workflow after resolving the failure. Repository Actions settings must allow GitHub Actions to create pull requests. The workflows use the built-in `GITHUB_TOKEN`; merging a release PR is the trigger, rather than a bot-created tag.
 
 The default executable download is pinned to the installed plugin version; it never executes an unverified latest release. Plugin folders remain self-contained. Third-party components and licensing are recorded in [NOTICE.md](NOTICE.md).

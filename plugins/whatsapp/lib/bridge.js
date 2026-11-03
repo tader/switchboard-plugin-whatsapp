@@ -8,6 +8,7 @@ import { fail } from "./errors.js";
 export class Bridge {
   constructor(executable, dir, { spawnProcess = spawn } = {}) {
     this.pending = new Map();
+    this.listeners = new Set();
     this.buffer = "";
     this.decoder = new StringDecoder("utf8");
     this.closed = false;
@@ -37,9 +38,13 @@ export class Bridge {
           this.child.kill();
           return;
         }
+        if (d.event === "changes" && d.id === undefined) {
+          for (const fn of [...this.listeners]) fn();
+          continue;
+        }
         const p = this.pending.get(d.id);
         if (!p) continue;
-        clearTimeout(p.timer);
+        p.cleanup();
         this.pending.delete(d.id);
         if (d.error) {
           const code = /^[a-z_]{1,100}$/.test(d.error.code)
@@ -63,22 +68,47 @@ export class Bridge {
   fail() {
     this.closed = true;
     for (const p of this.pending.values()) {
-      clearTimeout(p.timer);
+      p.cleanup();
       p.reject(fail("helper_unavailable", 503));
     }
     this.pending.clear();
+    for (const fn of [...this.listeners]) fn();
   }
-  call(method, args = {}) {
+  waitForChange(signal) {
+    if (this.closed || signal?.aborted) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => {
+        this.listeners.delete(done);
+        signal?.removeEventListener("abort", done);
+        resolve();
+      };
+      this.listeners.add(done);
+      signal?.addEventListener("abort", done, { once: true });
+    });
+  }
+  call(method, args = {}, { signal } = {}) {
     if (this.closed) return Promise.reject(fail("helper_unavailable", 503));
     if (this.pending.size >= 128)
       return Promise.reject(fail("helper_busy", 503));
     const id = randomUUID();
+    if (signal?.aborted) return Promise.reject(fail("cancelled", 499));
     return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
+      };
+      const abort = () => {
+        this.pending.delete(id);
+        cleanup();
+        reject(fail("cancelled", 499));
+      };
       const timer = setTimeout(() => {
         this.pending.delete(id);
+        cleanup();
         reject(fail("helper_timeout", 504));
       }, 100000);
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { resolve, reject, cleanup });
+      signal?.addEventListener("abort", abort, { once: true });
       this.child.stdin.write(JSON.stringify({ id, method, args }) + "\n");
     });
   }
@@ -140,6 +170,11 @@ export class Pool {
         await h.close();
         throw fail("helper_version_mismatch", 503);
       }
+      h.features = new Set(
+        Array.isArray(v.features)
+          ? v.features.filter((x) => typeof x === "string")
+          : [],
+      );
       return h;
     })();
     this.helpers.set(id, p);
@@ -150,8 +185,8 @@ export class Pool {
       throw e;
     }
   }
-  async call(id, method, args) {
-    return (await this.get(id)).call(method, args);
+  async call(id, method, args, options) {
+    return (await this.get(id)).call(method, args, options);
   }
   async restart(id) {
     const h = this.helpers.get(id);

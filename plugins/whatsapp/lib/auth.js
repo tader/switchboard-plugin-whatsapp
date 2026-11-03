@@ -18,7 +18,7 @@ export function createAuth(pool, capabilities = {}) {
       { mode: 0o600 },
     );
     return {
-      credentials: { profile, account: state.account },
+      credentials: { profile, account: state.account, sessionRevision: randomUUID() },
       account: { id: state.account, label: state.account },
       config: { access: access === "write" ? "write" : "read" },
     };
@@ -142,11 +142,11 @@ export function createAuth(pool, capabilities = {}) {
   }
   return {
     methods: [method("qr"), method("phone")],
-    async ready(conn) {
+    async ready(conn, options) {
       pool.profile(conn.credentials?.profile);
       const status = await pool.call(conn.credentials.profile, "start", {
         expectedAccount: conn.credentials.account,
-      });
+      }, options);
       if (status.account && status.account !== conn.credentials.account)
         throw fail("account_mismatch", 403);
       return status;

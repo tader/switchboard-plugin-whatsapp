@@ -119,7 +119,12 @@ func (a *app) write(ctx context.Context, method string, in args) (any, error) {
 		return nil, &fault{"send_uncertain", 502, false}
 	}
 	own := a.cli.Store.ID.ToNonAD()
-	_ = a.ingest(&events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: own, IsFromMe: true, IsGroup: chat.Server == types.GroupServer}, ID: resp.ID, Timestamp: resp.Timestamp}, Message: m})
+	if cacheErr := a.ingest(&events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: own, IsFromMe: true, IsGroup: chat.Server == types.GroupServer}, ID: resp.ID, Timestamp: resp.Timestamp}, Message: m}); cacheErr != nil {
+		a.mu.Lock()
+		a.cacheFailed = true
+		a.mu.Unlock()
+		a.notifyChanges()
+	}
 	return map[string]any{"ok": true, "messageId": resp.ID, "chat": chat.String(), "timestamp": resp.Timestamp.UnixMilli()}, nil
 }
 func (a *app) history(ctx context.Context, in args) (any, error) {

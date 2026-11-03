@@ -44,6 +44,7 @@ export class Service {
         sessionTransfer: false,
       };
     if (op.id === "getWhatsAppStatus") return call("status", {});
+    if (op.id === "getWhatsAppChat") return call("chat");
     if (op.id === "listWhatsAppChats") return call("chats");
     if (op.id === "listWhatsAppMessages") return call("messages");
     if (op.id === "getWhatsAppMessage") return call("message");

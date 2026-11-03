@@ -23,14 +23,7 @@ export interface PluginManifest {
 export interface Field {
   key: string;
   label: string;
-  type?:
-    | "text"
-    | "secret"
-    | "url"
-    | "textarea"
-    | "select"
-    | "boolean"
-    | "credential-source";
+  type?: 'text' | 'secret' | 'url' | 'textarea' | 'select' | 'boolean' | 'credential-source';
   description?: string;
   placeholder?: string;
   required?: boolean;
@@ -65,20 +58,12 @@ export interface PluginContext {
   dataDir: string;
   /** True when this instance has a peer connection configured. */
   peer: boolean;
+  /** Optional for compatibility with older Switchboard instances. */
   capabilities?: { deviceQr?: boolean; deviceUpdates?: boolean; deviceBrowser?: boolean };
   /** Core MCP OAuth discovery and encrypted connect-flow integration. */
   mcp: { oauth(): AuthMethod };
   /** Backend-only, bound to the acting user and consumer source selection. */
-  credentials?: {
-    obtain(
-      ref: string,
-      options: {
-        format: string;
-        forceAuthentication?: boolean;
-        signal?: AbortSignal;
-      },
-    ): Promise<CredentialBundle>;
-  };
+  credentials?: { obtain(ref: string, options: { format: string; forceAuthentication?: boolean; signal?: AbortSignal }): Promise<CredentialBundle> };
 }
 
 export interface PluginInstance {
@@ -88,9 +73,7 @@ export interface PluginInstance {
   dispose?(): void | Promise<void>;
 }
 
-export type PluginSetup = (
-  ctx: PluginContext,
-) => PluginInstance | Promise<PluginInstance>;
+export type PluginSetup = (ctx: PluginContext) => PluginInstance | Promise<PluginInstance>;
 
 export interface AccountInfo {
   /** Stable id at the provider. Reconnecting the same account updates the existing connection. */
@@ -101,7 +84,7 @@ export interface AccountInfo {
 }
 
 /** What Switchboard knows about one connected account. */
-export type ConnectionKind = "http" | "mcp";
+export type ConnectionKind = 'http' | 'mcp';
 
 export interface Connection {
   /** Omitted by older plugins; defaults to HTTP. */
@@ -162,7 +145,6 @@ export type DeviceAuthorization = {
   qrExpiresAt?: never;
 });
 
-
 /**
  * Result of a connect step:
  *  - Connected: done
@@ -174,9 +156,7 @@ export type ConnectStep =
   | { redirect: string; pending?: any }
   | { device: DeviceAuthorization; pending?: any };
 
-export type PollResult =
-  | Connected
-  | { wait: true; pending?: any; interval?: number; device?: DeviceAuthorization };
+export type PollResult = Connected | { wait: true; pending?: any; interval?: number; device?: DeviceAuthorization };
 
 export interface ConnectArgs {
   config: Record<string, any>;
@@ -196,7 +176,7 @@ export interface TokenResult {
 }
 
 export interface ReusableCredentials {
-  kind: "static" | "oauth";
+  kind: 'static' | 'oauth';
   /** Versioned authentication bundle format; matching field names alone are not compatible. */
   format: string;
   /** Immutable authority/client context. Never returned to clients. */
@@ -206,11 +186,7 @@ export interface ReusableCredentials {
   /** Applies semantic provider scope implications, e.g. full Drive includes readonly Drive. */
   coversScopes?(granted: string[], required: string[]): boolean;
   configKeys?: string[];
-  applyToken?(
-    req: OutgoingRequest,
-    conn: Connection,
-    token: TokenResult,
-  ): void | Promise<void>;
+  applyToken?(req: OutgoingRequest, conn: Connection, token: TokenResult): void | Promise<void>;
   exportCredentials?(credentials: any): any;
   importCredentials?(credentials: any): any;
   prepare?(config: Record<string, any>, previous: any): any;
@@ -219,21 +195,10 @@ export interface ReusableCredentials {
   allowRequest?(req: OutgoingRequest, conn: Connection): boolean;
 }
 
-export interface CredentialBundle {
-  format: string;
-  bundle: any;
-  account: AccountInfo;
-}
+export interface CredentialBundle { format: string; bundle: any; account: AccountInfo }
 export interface CredentialProvider {
   format: string;
-  provide(
-    conn: Connection,
-    opts: {
-      forceAuthentication: boolean;
-      signal?: AbortSignal;
-      persistCredentials(credentials: any): void | Promise<void>;
-    },
-  ): Promise<Omit<CredentialBundle, "format"> & { credentials?: any }>;
+  provide(conn: Connection, opts: { forceAuthentication: boolean; signal?: AbortSignal; persistCredentials(credentials: any): void | Promise<void> }): Promise<Omit<CredentialBundle, 'format'> & { credentials?: any }>;
 }
 export interface AuthMethod {
   /** Sharing API access never implies sharing credentials. Providers require an explicit peer credential grant. */
@@ -252,46 +217,27 @@ export interface AuthMethod {
   hidden?: boolean;
   connect(args: ConnectArgs): Promise<ConnectStep> | ConnectStep;
   /** Completes a redirect flow. `params` are the query parameters the provider returned. */
-  callback?(
-    args: ConnectArgs & { pending: any; params: Record<string, string> },
-  ): Promise<Connected>;
+  callback?(args: ConnectArgs & { pending: any; params: Record<string, string> }): Promise<Connected>;
   /** Advances a device flow. */
   poll?(args: ConnectArgs & { pending: any }): Promise<PollResult>;
   /**
    * Adds credentials to an outgoing request. `force` is set when a previous attempt got a 401,
    * so cached tokens should be refreshed. Return new credentials to persist them.
    */
-  authorize(
-    req: OutgoingRequest,
-    conn: Connection,
-    opts: {
-      force?: boolean;
-      signal?: AbortSignal;
-      persistCredentials?: (credentials: any) => void | Promise<void>;
-    },
-  ): Promise<void | { credentials?: any }> | void | { credentials?: any };
+  authorize(req: OutgoingRequest, conn: Connection, opts: { force?: boolean; signal?: AbortSignal; persistCredentials?: (credentials: any) => void | Promise<void> }): Promise<void | { credentials?: any }> | void | { credentials?: any };
   /** Message authentication before the operation session starts. For a definitive
    * rejection throw an Error with code='WEBSOCKET_AUTH_REJECTED'; core retries once
    * with force=true. Never include credentials in error messages. */
-  authenticateWebSocket?(
-    channel: WebSocketChannel,
-    conn: Connection,
-    opts: { force: boolean; signal: AbortSignal },
-  ): Promise<void | { credentials?: any }>;
+  authenticateWebSocket?(channel: WebSocketChannel, conn: Connection, opts: { force: boolean; signal: AbortSignal }): Promise<void | { credentials?: any }>;
   /** Hands out a usable bearer token, for scripts that use a provider SDK directly. */
-  token?(
-    conn: Connection,
-    opts: {
-      force?: boolean;
-      signal?: AbortSignal;
-      persistCredentials?: (credentials: any) => void | Promise<void>;
-    },
-  ): Promise<TokenResult>;
+  token?(conn: Connection, opts: { force?: boolean; signal?: AbortSignal; persistCredentials?: (credentials: any) => void | Promise<void> }): Promise<TokenResult>;
   /** Called when the connection is deleted. */
   revoke?(conn: Connection): Promise<void>;
 }
 
 export interface ServiceDefinition {
+  /** Optional provider-independent contract, alongside existing APIs. */
+  contracts?: ContractDefinition;
   /** Omitted by existing plugins; defaults to HTTP. */
   kind?: ConnectionKind;
   /** Globally unique, e.g. "gmail". */
@@ -312,12 +258,7 @@ export interface ServiceDefinition {
    * OpenAPI (3.x) or Swagger (2.0) document: a URL, or the parsed document.
    * When its server is a placeholder or not an allowed host, the connection's base URL is used instead.
    */
-  openapi?:
-    | string
-    | object
-    | ((
-        conn: Connection,
-      ) => string | object | undefined | Promise<string | object | undefined>);
+  openapi?: string | object | ((conn: Connection) => string | object | undefined | Promise<string | object | undefined>);
   /** Optional alongside REST. Endpoint and credentials are never client inputs. */
   websocket?: WebSocketCapability;
   authMethods: AuthMethod[];
@@ -327,12 +268,12 @@ export interface WebSocketOperation {
   id: string;
   title: string;
   description?: string;
-  mode: "command" | "subscription";
+  mode: 'command' | 'subscription';
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
   eventSchema?: Record<string, unknown>;
   /** Dedicated REST endpoint relative to /api/connections/:ref/plugin. Commands only. */
-  rest?: { method: "GET" | "POST" | "PUT"; path: string };
+  rest?: { method: 'GET' | 'POST' | 'PUT'; path: string };
   readOnlyHint?: boolean;
   idempotentHint?: boolean;
 }
@@ -347,17 +288,8 @@ export interface WebSocketChannel {
 }
 
 export interface WebSocketSession {
-  call(
-    operationId: string,
-    args: Record<string, unknown>,
-    signal: AbortSignal,
-  ): Promise<unknown>;
-  subscribe?(
-    operationId: string,
-    args: Record<string, unknown>,
-    emit: (event: unknown) => void,
-    signal: AbortSignal,
-  ): Promise<{ stop?: () => void | Promise<void> }>;
+  call(operationId: string, args: Record<string, unknown>, signal: AbortSignal): Promise<unknown>;
+  subscribe?(operationId: string, args: Record<string, unknown>, emit: (event: unknown) => void, signal: AbortSignal): Promise<{ stop?: () => void | Promise<void> }>;
   dispose?(): void | Promise<void>;
 }
 
@@ -366,9 +298,67 @@ export interface WebSocketCapability {
   proxy?: boolean;
   endpoint: string | ((conn: Connection) => string);
   operations: WebSocketOperation[];
-  createSession(args: {
-    channel: WebSocketChannel;
-    connection: Connection;
-    signal: AbortSignal;
-  }): WebSocketSession | Promise<WebSocketSession>;
+  createSession(args: { channel: WebSocketChannel; connection: Connection; signal: AbortSignal }): WebSocketSession | Promise<WebSocketSession>;
+}
+
+/** HTTP requests remain bound to the current connection and its permission boundary. */
+export interface ContractRequest { method: string; url: string; pathParams?: Record<string,string>; query?: [string,string][]; headers?: [string,string][]; body?: Uint8Array|string|null }
+export type Category = 'calendar' | 'email' | 'messaging';
+export type Coverage = { complete: boolean; reason?: string };
+export interface Page<T> { items: T[]; nextCursor?: string; coverage: Coverage }
+export interface Resource { id: string; version?: string }
+export interface Calendar extends Resource { name: string; timeZone: string | null; canWrite: boolean | null }
+export interface CalendarEvent extends Resource {
+  calendarId: string; title: string; description?: string; location?: string;
+  start: { date: string } | { dateTime: string; timeZone: string };
+  /** All-day end dates are exclusive. */
+  end: { date: string } | { dateTime: string; timeZone: string };
+  seriesId?: string; occurrenceId?: string;
+}
+export interface MailCollection extends Resource { name: string; kind: 'folder' | 'label' | 'virtual' }
+export interface Address { address: string; name?: string }
+export interface EmailMessage extends Resource {
+  subject: string; from: Address[]; to: Address[]; collectionIds: string[];
+  text: string; html?: string; isRead: boolean | null; draft: boolean;
+}
+export interface Conversation extends Resource { title: string; kind: 'direct' | 'group' | 'channel' | 'agent'; unread: number | null; updatedAt?:string|null }
+export interface Message extends Resource {
+ conversationId:string; text:string|null; authorId:string|null; createdAt:string|null; isOwn:boolean|null;
+ contentState:'available'|'unavailable'|'restricted'|'deleted'; contentType:'text'|'media'|'poll'|'system'|'unknown';
+ threadId?:string;replyToId?:string;
+ reactions?:{emoji:string;count:number|null;me:boolean|null}[];
+}
+export interface WriteReceipt { status: 'accepted' | 'rejected' | 'uncertain'; resourceId?: string; version?: string; code?: string }
+export interface ContractContext {
+  connection: Connection; signal: AbortSignal;
+  /** Core write intent key; absent for reads. Reuse when calling a nested durable write ledger. */
+  idempotencyKey?:string;
+  /** Bound to this connection; uses Switchboard's normal authorization/host checks. */
+  request(input: ContractRequest): Promise<Response>;
+}
+export interface ContractOperation {
+  category: Category; readOnly: boolean;
+  inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown>;
+  invoke(input: Record<string, unknown>, context: ContractContext): Promise<unknown>;
+}
+export interface ContractChangeBatch { events: {sourceId:string;event:ChangeEvent}[]; checkpoint:string }
+export interface ContractWatchContext extends ContractContext {
+  /** Resolves only after events and the native checkpoint are durably committed. */
+  publish(batch:ContractChangeBatch):Promise<void>;
+}
+export interface ContractDefinition {
+  /** Read-only native receive loop. Run until signal aborts; release listeners/sockets in finally.
+   * Checkpoints are independent of collect(). Acknowledge upstream only after publish resolves. */
+  watch?(input:{checkpoint?:string},context:ContractWatchContext):Promise<void>;
+  /** Read-only reconciliation. Checkpoint and events commit together in the core. */
+  collect?(input:{checkpoint?:string},context:ContractContext):Promise<{events:{sourceId:string;event:ChangeEvent}[];checkpoint:string}>;
+  version: 1;
+  operations: Record<string, ContractOperation>;
+  /** Must report effective connection permissions, without exposing credentials. */
+  available(connection: Connection): string[] | Promise<string[]>;
+}
+export interface ChangeEvent {
+  category: Category; type: 'created' | 'updated' | 'deleted' | 'invalidated' | 'resync.required';
+  resourceType: string; resourceId?: string; collectionId?: string; version?: string;
+  occurredAt?: string;
 }

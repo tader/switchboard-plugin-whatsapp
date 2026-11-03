@@ -739,9 +739,11 @@ test("QR is the default method, needs no phone number, rotates and stores only a
   f.ready();
   const result = await auth.poll({ pending: flow.pending });
   assert.deepEqual(result.config, { access: "read" });
-  assert.deepEqual(Object.keys(result.credentials).sort(), ["account", "profile"]);
+  assert.deepEqual(Object.keys(result.credentials).sort(), ["account", "profile", "sessionRevision"]);
   assert.equal(result.credentials.account, account);
-  assert.equal((await auth.connect({ config: {}, connection: { credentials: result.credentials } })).account.id, account);
+  const reconnected=await auth.connect({ config: {}, connection: { credentials: result.credentials } });
+  assert.equal(reconnected.account.id,account);assert.equal(reconnected.credentials.profile,result.credentials.profile);
+  assert.notEqual(reconnected.credentials.sessionRevision,result.credentials.sessionRevision);
 });
 
 test("QR reconnect restarts revoked sessions and retains the original account binding", async t => {

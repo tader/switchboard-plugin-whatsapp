@@ -10,6 +10,7 @@ The service base URL is `http://whatsapp.localhost`. Use these routes through Sw
 
 ## Discovery and history
 
+- `GET /chats/info?chat=123456789@s.whatsapp.net`: one exact synced chat.
 - `GET /chats?type=all&limit=50`: `type` can be `all`, `direct` or `group`.
 - `GET /messages?chat=123456789@s.whatsapp.net&limit=50`.
 - `GET /messages/info?chat=123456789@s.whatsapp.net&messageId=EXACT_ID`.

@@ -1,3 +1,4 @@
+import { createMessaging } from "./messaging.js";
 import http from "node:http";
 import { randomBytes } from "node:crypto";
 import { Pool } from "./bridge.js";
@@ -123,6 +124,7 @@ export async function createAdapter(ctx, { pool = new Pool(ctx) } = {}) {
         baseUrl: "http://whatsapp.localhost",
         allowedHosts: ["whatsapp.localhost", origin.host],
         openapi,
+        contracts: createMessaging(ctx.dataDir, pool, auth),
         authMethods: auth.methods.map(method => ({
             ...method,
             async authorize(req, conn, opts = {}) {
