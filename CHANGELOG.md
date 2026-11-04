@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.1.0...v1.2.0) (2026-11-04)
+
+
+### Features
+
+* add shared Messaging contracts and native changes ([#9](https://github.com/tader/switchboard-plugin-whatsapp/issues/9)) ([ed1431d](https://github.com/tader/switchboard-plugin-whatsapp/commit/ed1431d6711204eb4a350aa2fca45d50391ea1ce))
+
 ## [1.1.0](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.0.1...v1.1.0) (2026-10-23)
 
 
