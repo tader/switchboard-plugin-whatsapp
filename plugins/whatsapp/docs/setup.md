@@ -28,3 +28,9 @@ For remote access, either pair on that remote Switchboard or share an existing c
 Removing the connection stops its helper and removes that profile's local session/cache. To revoke the device on WhatsApp, remove the linked-device entry created for this plugin from the phone's **Linked devices** screen too (it may appear as Switchboard or Chrome). Local removal does not change other WhatsApp devices. Durable write receipts remain separate to avoid accidental resends during reconnects.
 
 If the helper cannot start, check executable permissions, supported architecture/version, and write access to the plugin data directory. `session_already_open` means another process owns that session; stop the duplicate before retrying. If a published helper cannot be downloaded, use an explicitly configured executable built at the installed plugin version. A checksum mismatch never executes the downloaded file.
+
+Message history resolves phone-number and LID conversation aliases using authenticated
+account metadata or WhatsApp's persisted identity mapping. Existing conversation
+IDs and cursors remain valid; history rows use the requested conversation ID and
+duplicate remote message IDs are removed before pagination. Unknown mappings stay
+separate. This does not merge or rename entries in the conversation directory.
