@@ -75,6 +75,7 @@ type app struct {
 	syncAt      int64
 	syncBatches int
 	cacheFailed bool
+	changesWake chan struct{}
 }
 
 func openApp(dir string) (*app, func(), error) {
@@ -132,7 +133,7 @@ func (a *app) status() map[string]any {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return map[string]any{"ready": a.cli.IsConnected() && a.cli.IsLoggedIn(), "paired": account != "", "account": account, "historyCoverage": "synced_cache_only", "lastHistorySync": a.syncAt, "historySyncBatches": a.syncBatches, "cacheHealthy": !a.cacheFailed}
+	return map[string]any{"ready": a.cli.IsConnected() && a.cli.IsLoggedIn(), "paired": account != "", "revoked": a.cli.Store.Deleted, "account": account, "historyCoverage": "synced_cache_only", "lastHistorySync": a.syncAt, "historySyncBatches": a.syncBatches, "cacheHealthy": !a.cacheFailed}
 }
 func (a *app) event(evt any) {
 	switch e := evt.(type) {
@@ -148,7 +149,13 @@ func (a *app) event(evt any) {
 			if err != nil {
 				continue
 			}
-			a.db.Exec("INSERT INTO sb_chats(chat,name,ts) VALUES(?,?,0) ON CONFLICT(chat) DO UPDATE SET name=CASE WHEN excluded.name<>'' THEN excluded.name ELSE sb_chats.name END", chat.String(), c.GetName())
+			_, nameErr := a.db.Exec("INSERT INTO sb_chats(chat,name,ts) VALUES(?,?,0) ON CONFLICT(chat) DO UPDATE SET name=CASE WHEN excluded.name<>'' THEN excluded.name ELSE sb_chats.name END", chat.String(), c.GetName())
+			if nameErr != nil {
+				a.mu.Lock()
+				a.cacheFailed = true
+				a.mu.Unlock()
+			}
+			a.notifyChanges()
 			for _, m := range c.GetMessages() {
 				event, err := a.cli.ParseWebMessage(chat, m.GetMessage())
 				if err == nil && event != nil {
@@ -165,10 +172,12 @@ func (a *app) event(evt any) {
 		a.syncBatches++
 		a.mu.Unlock()
 	case *events.LoggedOut:
+		defer a.notifyChanges()
 		a.mu.Lock()
 		a.started = false
 		a.mu.Unlock()
 	case events.PermanentDisconnect:
+		defer a.notifyChanges()
 		a.mu.Lock()
 		a.started = false
 		a.mu.Unlock()
@@ -176,7 +185,7 @@ func (a *app) event(evt any) {
 }
 func (a *app) dispatch(ctx context.Context, method string, in args) (any, error) {
 	if method == "version" {
-		return map[string]any{"version": version, "protocol": 1}, nil
+		return map[string]any{"version": version, "protocol": 1, "features": []string{"changes.v1"}}, nil
 	}
 	if method == "start" {
 		return a.start(ctx, in)
@@ -188,6 +197,10 @@ func (a *app) dispatch(ctx context.Context, method string, in args) (any, error)
 		return a.status(), nil
 	}
 	switch method {
+	case "changes":
+		return a.changes(in)
+	case "chat":
+		return a.chat(in)
 	case "chats":
 		return a.chats(in)
 	case "messages":
@@ -213,19 +226,47 @@ func serve(input io.Reader, output io.Writer, a *app) {
 	scanner := bufio.NewScanner(input)
 	scanner.Buffer(make([]byte, 4096), 128*1024)
 	encoder := json.NewEncoder(output)
+	var writeMu sync.Mutex
+	encode := func(value any) error { writeMu.Lock(); defer writeMu.Unlock(); return encoder.Encode(value) }
+	done := make(chan struct{})
+	var workers sync.WaitGroup
+	workers.Add(1)
+	go func() {
+		defer workers.Done()
+		for {
+			select {
+			case <-done:
+				return
+			case <-a.changesWake:
+				select {
+				case <-done:
+					return
+				case <-time.After(25 * time.Millisecond):
+				}
+				select {
+				case <-a.changesWake:
+				default:
+				}
+				if encode(map[string]string{"event": "changes"}) != nil {
+					return
+				}
+			}
+		}
+	}()
+	defer func() { close(done); workers.Wait() }()
 	for scanner.Scan() {
 		var r request
 		decoder := json.NewDecoder(bytes.NewReader(scanner.Bytes()))
 		decoder.DisallowUnknownFields()
 		if decoder.Decode(&r) != nil || len(r.ID) > 128 || r.ID == "" {
-			encoder.Encode(response{ID: r.ID, Error: bad("invalid_request", 400)})
+			encode(response{ID: r.ID, Error: bad("invalid_request", 400)})
 			continue
 		}
 		var in args
 		decoder = json.NewDecoder(bytes.NewReader(r.Args))
 		decoder.DisallowUnknownFields()
 		if decoder.Decode(&in) != nil {
-			encoder.Encode(response{ID: r.ID, Error: bad("invalid_arguments", 400)})
+			encode(response{ID: r.ID, Error: bad("invalid_arguments", 400)})
 			continue
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 85*time.Second)
@@ -240,7 +281,7 @@ func serve(input io.Reader, output io.Writer, a *app) {
 			reply.Result = nil
 			reply.Error = f
 		}
-		if encoder.Encode(reply) != nil {
+		if encode(reply) != nil {
 			return
 		}
 	}

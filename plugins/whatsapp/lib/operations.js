@@ -23,6 +23,14 @@ const text = str("Message text.", { minLength: 1, maxLength: 4000 });
 export const operations = [
   [
     "GET",
+    "/chats/info",
+    "getWhatsAppChat",
+    "Read one synced chat without marking it read",
+    { chat },
+    ["chat"],
+  ],
+  [
+    "GET",
     "/status",
     "getWhatsAppStatus",
     "Check linked-device connection and history-sync status",

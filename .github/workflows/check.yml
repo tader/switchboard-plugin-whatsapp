@@ -1,5 +1,12 @@
 name: Check WhatsApp plugin
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Expected release PR head commit
+        required: false
 permissions:
   contents: read
 jobs:
@@ -15,6 +22,11 @@ jobs:
         with:
           go-version-file: bridge/go.mod
           cache-dependency-path: bridge/go.sum
+      - name: Check dispatched revision
+        if: github.event_name == 'workflow_dispatch' && inputs.expected_sha != ''
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - run: npm ci
       - run: npm run check
       - run: npm test
@@ -30,6 +42,16 @@ jobs:
       - run: npm run integration
         env:
           SWITCHBOARD_ROOT: ${{ github.workspace }}/switchboard-core
+      - name: Checkout staged contract core
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: tader/switchboard
+          ref: c832b1be994169f7dbabc84f836107e51ea18318
+          path: switchboard-contract-core
+      - run: npm ci --prefix switchboard-contract-core
+      - run: npm run integration:contracts
+        env:
+          SWITCHBOARD_ROOT: ${{ github.workspace }}/switchboard-contract-core
   cross-build:
     runs-on: ubuntu-latest
     strategy:

@@ -8,10 +8,12 @@
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
     "test:bridge": "cd bridge && go test -race ./...",
     "build:bridge": "cd bridge && go build -trimpath -o ../.local/whatsapp-bridge .",
-    "integration": "node --disable-warning=ExperimentalWarning scripts/integration.js"
+    "integration": "node --disable-warning=ExperimentalWarning scripts/integration.js",
+    "integration:contracts": "node --disable-warning=ExperimentalWarning scripts/contract-integration.js"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "ajv": "^8.20.0",
     "typescript": "^5.9.0"
   }
 }

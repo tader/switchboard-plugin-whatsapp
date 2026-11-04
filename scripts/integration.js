@@ -44,7 +44,10 @@ globalThis.fetch = async (input, opts = {}) => {
   const url = String(input);
   if (url.startsWith("https://api.github.com/repos/fixture/whatsapp/")) {
     if (url.includes("/releases")) {
-      const r = { tag_name: `v${version}`, published_at: "2026-10-19T00:00:00Z" };
+      const r = {
+        tag_name: `v${version}`,
+        published_at: "2026-10-19T00:00:00Z",
+      };
       return Response.json(url.endsWith("/latest") ? r : [r]);
     }
     if (url.includes("/commits/")) return new Response(sha);
@@ -62,6 +65,7 @@ try {
   assert.deepEqual(await native.call("version"), {
     protocol: 1,
     version,
+    features: ["changes.v1"],
   });
   assert.equal((await native.call("status")).ready, false);
   await native.close();
@@ -93,7 +97,10 @@ try {
   const connected = await connections.pollDevice(flow.flowId, user);
   assert.equal(connected.status, "connected");
   const connection = connected.connection;
-  const qr = await connections.startConnect(user, { service: "whatsapp", config: { access: "read" } });
+  const qr = await connections.startConnect(user, {
+    service: "whatsapp",
+    config: { access: "read" },
+  });
   assert.equal(qr.status, "device");
   assert.equal(qr.device.qrCode, "fixture-first-qr");
   assert.equal(qr.device.userCode, undefined);
@@ -149,7 +156,7 @@ try {
     connections.loadConnection(user.id, connection.id).conn,
   );
   assert(description.operations.some((o) => o.id === "voteWhatsAppPoll"));
-  assert.equal(description.operations.length, 10);
+  assert.equal(description.operations.length, 11);
   await manager.stop();
   await manager.start();
   r = await execute(user, connection.id, { method: "GET", url: "/status" });

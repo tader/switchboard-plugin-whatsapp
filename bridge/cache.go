@@ -18,7 +18,7 @@ var phoneRE = regexp.MustCompile(`^[1-9][0-9]{6,14}$`)
 var idRE = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 
 func parseChat(s string) (types.JID, error) {
-	if !chatRE.MatchString(s) {
+	if len(s) > 256 || !chatRE.MatchString(s) {
 		return types.EmptyJID, bad("invalid_chat", 400)
 	}
 	return types.ParseJID(s)
@@ -127,7 +127,10 @@ func (a *app) initCache() error {
 	if err != nil {
 		return err
 	}
-	return a.scrubQuoteCache()
+	if err = a.scrubQuoteCache(); err != nil {
+		return err
+	}
+	return a.initChanges()
 }
 func (a *app) ingest(e *events.Message) error {
 	m, err := normalize(e)
@@ -138,7 +141,12 @@ func (a *app) ingest(e *events.Message) error {
 		return nil
 	}
 	p, _ := json.Marshal(m.Poll)
-	_, err = a.db.Exec(`INSERT INTO sb_messages VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(chat,id) DO UPDATE SET text=excluded.text,kind=excluded.kind,reply_to=excluded.reply_to,poll=excluded.poll,truncated=excluded.truncated,raw=excluded.raw,revision=excluded.revision WHERE excluded.revision>=sb_messages.revision`, m.Chat, m.ID, m.Sender, m.FromMe, m.Timestamp, m.Text, m.Type, m.ReplyTo, string(p), m.Truncated, m.raw, m.revision)
+	tx, err := a.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec(`INSERT INTO sb_messages VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(chat,id) DO UPDATE SET text=excluded.text,kind=excluded.kind,reply_to=excluded.reply_to,poll=excluded.poll,truncated=excluded.truncated,raw=excluded.raw,revision=excluded.revision WHERE excluded.revision>=sb_messages.revision`, m.Chat, m.ID, m.Sender, m.FromMe, m.Timestamp, m.Text, m.Type, m.ReplyTo, string(p), m.Truncated, m.raw, m.revision)
 	if err != nil {
 		return err
 	}
@@ -146,8 +154,15 @@ func (a *app) ingest(e *events.Message) error {
 	if !e.Info.IsGroup && !e.Info.IsFromMe {
 		name = e.Info.PushName
 	}
-	_, err = a.db.Exec(`INSERT INTO sb_chats(chat,name,ts) VALUES(?,?,?) ON CONFLICT(chat) DO UPDATE SET ts=max(sb_chats.ts,excluded.ts),name=CASE WHEN sb_chats.name='' THEN excluded.name ELSE sb_chats.name END`, m.Chat, name, m.Timestamp)
-	return err
+	_, err = tx.Exec(`INSERT INTO sb_chats(chat,name,ts) VALUES(?,?,?) ON CONFLICT(chat) DO UPDATE SET ts=max(sb_chats.ts,excluded.ts),name=CASE WHEN sb_chats.name='' THEN excluded.name ELSE sb_chats.name END`, m.Chat, name, m.Timestamp)
+	if err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	a.notifyChanges()
+	return nil
 }
 
 const columns = "chat,id,sender,from_me,ts,text,kind,reply_to,poll,truncated,raw,revision"

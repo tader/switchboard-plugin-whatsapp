@@ -1,0 +1,685 @@
+{
+  "version": 1,
+  "operations": {
+    "messaging.conversations.list": {
+      "input": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/conversation"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "coverage": {
+            "$ref": "#/definitions/coverage"
+          }
+        },
+        "required": [
+          "items",
+          "coverage"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "messaging.conversations.get": {
+      "input": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$ref": "#/definitions/conversation"
+      }
+    },
+    "messaging.conversations.create": {
+      "input": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "participantIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "kind": {
+            "enum": [
+              "direct",
+              "group",
+              "channel"
+            ]
+          }
+        },
+        "required": [
+          "participantIds",
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$ref": "#/definitions/receipt"
+      }
+    },
+    "messaging.messages.list": {
+      "input": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "description": "Optional opaque thread identifier. Returns the root and replies within this thread. Adapters without thread filtering must reject this field in inputConstraints."
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/message"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "coverage": {
+            "$ref": "#/definitions/coverage"
+          }
+        },
+        "required": [
+          "items",
+          "coverage"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "messaging.messages.get": {
+      "input": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "conversationId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$ref": "#/definitions/message"
+      }
+    },
+    "messaging.messages.send": {
+      "input": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "replyToId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "conversationId",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$ref": "#/definitions/receipt"
+      }
+    },
+    "messaging.messages.update": {
+      "input": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "conversationId",
+          "id",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$ref": "#/definitions/receipt"
+      }
+    },
+    "messaging.messages.delete": {
+      "input": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "conversationId",
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$ref": "#/definitions/receipt"
+      }
+    },
+    "messaging.threads.list": {
+      "input": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/thread"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "coverage": {
+            "$ref": "#/definitions/coverage"
+          }
+        },
+        "required": [
+          "items",
+          "coverage"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "messaging.reactions.update": {
+      "input": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "emoji": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "remove": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "conversationId",
+          "messageId",
+          "emoji"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$ref": "#/definitions/receipt"
+      }
+    },
+    "messaging.readState.update": {
+      "input": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "lastReadMessageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "conversationId",
+          "lastReadMessageId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$ref": "#/definitions/receipt"
+      }
+    }
+  },
+  "definitions": {
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "complete"
+      ],
+      "additionalProperties": false
+    },
+    "receipt": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "uncertain"
+          ]
+        },
+        "resourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "conversation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 65536
+        },
+        "kind": {
+          "enum": [
+            "direct",
+            "group",
+            "channel",
+            "agent"
+          ]
+        },
+        "unread": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "updatedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "unread"
+      ],
+      "additionalProperties": false
+    },
+    "message": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "conversationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 262144
+        },
+        "authorId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "threadId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "replyToId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "contentState": {
+          "enum": [
+            "available",
+            "unavailable",
+            "restricted",
+            "deleted"
+          ]
+        },
+        "contentType": {
+          "enum": [
+            "text",
+            "media",
+            "poll",
+            "system",
+            "unknown"
+          ]
+        },
+        "reactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "emoji": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "count": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "me": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "emoji",
+              "count",
+              "me"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "isOwn": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "conversationId",
+        "text",
+        "authorId",
+        "createdAt",
+        "contentState",
+        "contentType",
+        "isOwn"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "contentState": {
+                "enum": [
+                  "restricted",
+                  "deleted",
+                  "unavailable"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "text": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "thread": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "conversationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "replyCount": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "conversationId",
+        "title",
+        "replyCount"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
