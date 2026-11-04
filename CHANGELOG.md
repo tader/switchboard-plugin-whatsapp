@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.2.0...v1.2.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* read message history across verified WhatsApp chat aliases ([#11](https://github.com/tader/switchboard-plugin-whatsapp/issues/11)) ([6c255b9](https://github.com/tader/switchboard-plugin-whatsapp/commit/6c255b98bc3b3e653ce6ccb2f7536b818fbe47e3))
+
 ## [1.2.0](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.1.0...v1.2.0) (2026-11-04)
 
 
