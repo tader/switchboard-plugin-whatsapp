@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -182,6 +183,54 @@ func scanMessage(row interface{ Scan(...any) error }) (message, error) {
 	}
 	return m, nil
 }
+
+// chatAlias resolves only authenticated account metadata or the library's persisted
+// PN/LID map. Never infer identity from names or matching numeric JID components.
+// Keep stored IDs and client cursors intact; read both aliases under the requested ID.
+func (a *app) chatAlias(chat string) (string, error) {
+	jid, err := parseChat(chat)
+	if err != nil {
+		return "", err
+	}
+	if jid.Server == types.GroupServer {
+		return chat, nil
+	}
+	device := a.cli.Store
+	if device.ID != nil && !device.LID.IsEmpty() {
+		pn, lid := device.ID.ToNonAD(), device.LID.ToNonAD()
+		if jid == pn {
+			return lid.String(), nil
+		}
+		if jid == lid {
+			return pn.String(), nil
+		}
+	}
+	if device.LIDs == nil {
+		return chat, nil
+	}
+	var alias types.JID
+	if jid.Server == types.HiddenUserServer {
+		alias, err = device.LIDs.GetPNForLID(context.Background(), jid)
+	} else {
+		alias, err = device.LIDs.GetLIDForPN(context.Background(), jid)
+	}
+	if err != nil {
+		return "", err
+	}
+	if alias.IsEmpty() {
+		return chat, nil
+	}
+	return alias.ToNonAD().String(), nil
+}
+
+// A late revoke/edit under the other alias supersedes the original. Dedupe before
+// applying pagination so the same remote message cannot appear on two pages.
+const aliasMessages = `WITH ranked AS (
+ SELECT ` + columns + `,row_number() OVER (PARTITION BY id ORDER BY revision DESC,
+ CASE WHEN kind='revoked' THEN 0 ELSE 1 END,ts DESC,chat) AS rank
+ FROM sb_messages WHERE chat IN (?,?)
+) SELECT ` + columns + ` FROM ranked WHERE rank=1`
+
 func (a *app) getMessage(chat, id string) (message, error) {
 	if _, err := parseChat(chat); err != nil {
 		return message{}, err
@@ -189,7 +238,11 @@ func (a *app) getMessage(chat, id string) (message, error) {
 	if !idRE.MatchString(id) {
 		return message{}, bad("invalid_message_id", 400)
 	}
-	return scanMessage(a.db.QueryRow("SELECT "+columns+" FROM sb_messages WHERE chat=? AND id=?", chat, id))
+	alias, err := a.chatAlias(chat)
+	if err != nil {
+		return message{}, err
+	}
+	return scanMessage(a.db.QueryRow(aliasMessages+" AND id=?", chat, alias, id))
 }
 
 type cursor struct {
@@ -242,7 +295,11 @@ func (a *app) messages(in args) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := a.db.Query("SELECT "+columns+" FROM sb_messages WHERE chat=? AND (ts<? OR (ts=? AND id<?)) ORDER BY ts DESC,id DESC LIMIT ?", in.Chat, c.Time, c.Time, c.ID, n+1)
+	alias, err := a.chatAlias(in.Chat)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := a.db.Query(aliasMessages+" AND (ts<? OR (ts=? AND id<?)) ORDER BY ts DESC,id DESC LIMIT ?", in.Chat, alias, c.Time, c.Time, c.ID, n+1)
 	if err != nil {
 		return nil, err
 	}
@@ -253,6 +310,7 @@ func (a *app) messages(in args) (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		m.Chat = in.Chat // Contract rows retain the requested conversation identity.
 		items = append(items, m.public())
 	}
 	if err = rows.Err(); err != nil {
