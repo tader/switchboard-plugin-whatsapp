@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.2](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.2.1...v1.2.2) (2026-11-05)
+
+
+### Bug Fixes
+
+* display WhatsApp sender contact names ([63daed6](https://github.com/tader/switchboard-plugin-whatsapp/commit/63daed63f84532d9c2f7008a03a7dcf0fc48a991))
+* show WhatsApp sender contact names ([dd8a3f4](https://github.com/tader/switchboard-plugin-whatsapp/commit/dd8a3f43b828730cce08c1f0045c670a7f7e8321))
+
 ## [1.2.1](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.2.0...v1.2.1) (2026-11-04)
 
 
