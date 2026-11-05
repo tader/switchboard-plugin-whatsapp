@@ -610,6 +610,14 @@
             "boolean",
             "null"
           ]
+        },
+        "authorDisplayName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512,
+          "minLength": 1
         }
       },
       "required": [

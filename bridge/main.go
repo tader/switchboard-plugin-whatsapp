@@ -137,6 +137,12 @@ func (a *app) status() map[string]any {
 }
 func (a *app) event(evt any) {
 	switch e := evt.(type) {
+	case *events.Contact:
+		a.invalidateSender(e.JID)
+	case *events.PushName:
+		a.invalidateSender(e.JID)
+	case *events.BusinessName:
+		a.invalidateSender(e.JID)
 	case *events.Message:
 		if err := a.ingest(e); err != nil {
 			a.mu.Lock()

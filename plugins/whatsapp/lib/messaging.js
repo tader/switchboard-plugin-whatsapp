@@ -36,6 +36,7 @@ export function message(raw) {
     conversationId: raw.chat,
     text: contentState === "available" ? text : null,
     authorId: raw.sender || null,
+    authorDisplayName: raw.authorDisplayName || null,
     createdAt: time(raw.timestamp),
     isOwn: typeof raw.fromMe === "boolean" ? raw.fromMe : null,
     contentState,
