@@ -616,8 +616,8 @@
             "string",
             "null"
           ],
-          "maxLength": 512,
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 512
         }
       },
       "required": [

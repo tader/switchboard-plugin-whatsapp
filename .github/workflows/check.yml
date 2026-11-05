@@ -46,7 +46,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: tader/switchboard
-          ref: c832b1be994169f7dbabc84f836107e51ea18318
+          ref: b21ffa9faf98d4faac991622a0caa44c967bb457
           path: switchboard-contract-core
       - run: npm ci --prefix switchboard-contract-core
       - run: npm run integration:contracts
