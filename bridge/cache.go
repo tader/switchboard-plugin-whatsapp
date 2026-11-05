@@ -31,18 +31,19 @@ type poll struct {
 	SelectableCount int      `json:"selectableCount"`
 }
 type message struct {
-	Chat      string `json:"chat"`
-	ID        string `json:"id"`
-	Sender    string `json:"sender"`
-	FromMe    bool   `json:"fromMe"`
-	Timestamp int64  `json:"timestamp"`
-	Text      string `json:"text"`
-	Type      string `json:"type"`
-	ReplyTo   string `json:"replyTo,omitempty"`
-	Poll      *poll  `json:"poll,omitempty"`
-	Truncated bool   `json:"textTruncated,omitempty"`
-	raw       []byte
-	revision  int64
+	Chat              string `json:"chat"`
+	ID                string `json:"id"`
+	Sender            string `json:"sender"`
+	AuthorDisplayName string `json:"authorDisplayName,omitempty"`
+	FromMe            bool   `json:"fromMe"`
+	Timestamp         int64  `json:"timestamp"`
+	Text              string `json:"text"`
+	Type              string `json:"type"`
+	ReplyTo           string `json:"replyTo,omitempty"`
+	Poll              *poll  `json:"poll,omitempty"`
+	Truncated         bool   `json:"textTruncated,omitempty"`
+	raw               []byte
+	revision          int64
 }
 
 func (m message) public() message { m.raw = nil; return m }
@@ -242,7 +243,11 @@ func (a *app) getMessage(chat, id string) (message, error) {
 	if err != nil {
 		return message{}, err
 	}
-	return scanMessage(a.db.QueryRow(aliasMessages+" AND id=?", chat, alias, id))
+	m, err := scanMessage(a.db.QueryRow(aliasMessages+" AND id=?", chat, alias, id))
+	if err == nil {
+		m.AuthorDisplayName = a.senderName(m.Sender)
+	}
+	return m, err
 }
 
 type cursor struct {
@@ -315,6 +320,13 @@ func (a *app) messages(in args) (any, error) {
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
+	}
+	// Contact lookups share this one-connection database; release rows first.
+	if err = rows.Close(); err != nil {
+		return nil, err
+	}
+	for i := range items {
+		items[i].AuthorDisplayName = a.senderName(items[i].Sender)
 	}
 	var next any
 	if len(items) > n {

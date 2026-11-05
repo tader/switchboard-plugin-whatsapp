@@ -323,7 +323,7 @@ export interface EmailMessage extends Resource {
 }
 export interface Conversation extends Resource { title: string; kind: 'direct' | 'group' | 'channel' | 'agent'; unread: number | null; updatedAt?:string|null }
 export interface Message extends Resource {
- conversationId:string; text:string|null; authorId:string|null; createdAt:string|null; isOwn:boolean|null;
+ conversationId:string; text:string|null; authorId:string|null; authorDisplayName?:string|null; createdAt:string|null; isOwn:boolean|null;
  contentState:'available'|'unavailable'|'restricted'|'deleted'; contentType:'text'|'media'|'poll'|'system'|'unknown';
  threadId?:string;replyToId?:string;
  reactions?:{emoji:string;count:number|null;me:boolean|null}[];
