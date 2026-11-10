@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.3.1...v1.3.2) (2026-11-10)
+
+
+### Bug Fixes
+
+* document reaction user coverage ([0aa7c00](https://github.com/tader/switchboard-plugin-whatsapp/commit/0aa7c00253d7c7dcc69791dac5b68f88d39c757f))
+
 ## [1.3.1](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.3.0...v1.3.1) (2026-11-10)
 
 
