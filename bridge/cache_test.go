@@ -231,6 +231,15 @@ func TestReactionProjectionTracksNewestPerActorAndRemoval(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	page, err := a.messages(args{Chat: testChat, Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range page.(map[string]any)["items"].([]message) {
+		if row.Type == "reaction" {
+			t.Fatal("reaction event leaked as a separate message")
+		}
+	}
 	m, err := a.getMessage(testChat, "A")
 	if err != nil || len(m.Reactions) != 1 || m.Reactions[0].Emoji != "👍" || m.Reactions[0].Me == nil || !*m.Reactions[0].Me || m.Reactions[0].Count != nil {
 		t.Fatalf("%+v %v", m.Reactions, err)
