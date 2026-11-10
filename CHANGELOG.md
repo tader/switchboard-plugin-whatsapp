@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.3.0...v1.3.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* hide WhatsApp reaction events from history ([#17](https://github.com/tader/switchboard-plugin-whatsapp/issues/17)) ([591eaae](https://github.com/tader/switchboard-plugin-whatsapp/commit/591eaae6682b81f335560c4ce21928a862d09816))
+
 ## [1.3.0](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.2.2...v1.3.0) (2026-11-10)
 
 

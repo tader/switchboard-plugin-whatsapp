@@ -26,7 +26,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-var version = "1.3.0" // x-release-please-version
+var version = "1.3.1" // x-release-please-version
 
 type fault struct {
 	Code       string `json:"code"`
