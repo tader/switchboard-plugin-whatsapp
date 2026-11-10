@@ -39,6 +39,7 @@ export function message(raw) {
     authorDisplayName: raw.authorDisplayName || null,
     createdAt: time(raw.timestamp),
     isOwn: typeof raw.fromMe === "boolean" ? raw.fromMe : null,
+    ...(Array.isArray(raw.reactions) ? { reactions: raw.reactions } : {}),
     contentState,
     contentType:
       type === "text"

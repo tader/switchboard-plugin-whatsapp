@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"go.mau.fi/whatsmeow/proto/waAdv"
+	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -209,5 +210,36 @@ func TestRevokedDeviceRequiresNewNativeClient(t *testing.T) {
 	_, err := a.start(context.Background(), args{Phone: "123456789", ExpectedAccount: testChat})
 	if f, ok := err.(*fault); !ok || f.Code != "session_revoked" {
 		t.Fatal(err)
+	}
+}
+
+func TestReactionProjectionTracksNewestPerActorAndRemoval(t *testing.T) {
+	a := fixture(t)
+	for _, e := range []*events.Message{textEvent(testChat, "A", "message", 1000)} {
+		if err := a.ingest(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reactionEvent := func(id, emoji string, ts int64, own bool) *events.Message {
+		e := textEvent(testChat, id, "placeholder", ts)
+		e.Info.IsFromMe = own
+		e.Message = &waE2E.Message{ReactionMessage: &waE2E.ReactionMessage{Key: &waCommon.MessageKey{ID: proto.String("A")}, Text: proto.String(emoji)}}
+		return e
+	}
+	for _, e := range []*events.Message{reactionEvent("R1", "👍", 3000, true), reactionEvent("R2", "😂", 2000, true)} {
+		if err := a.ingest(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m, err := a.getMessage(testChat, "A")
+	if err != nil || len(m.Reactions) != 1 || m.Reactions[0].Emoji != "👍" || m.Reactions[0].Me == nil || !*m.Reactions[0].Me || m.Reactions[0].Count != nil {
+		t.Fatalf("%+v %v", m.Reactions, err)
+	}
+	if err := a.ingest(reactionEvent("R3", "", 4000, true)); err != nil {
+		t.Fatal(err)
+	}
+	m, err = a.getMessage(testChat, "A")
+	if err != nil || len(m.Reactions) != 0 {
+		t.Fatalf("%+v %v", m.Reactions, err)
 	}
 }

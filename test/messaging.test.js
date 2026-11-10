@@ -6,7 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { Ajv } from "ajv";
 import { fixture, chat, account } from "./contracts-fixture.js";
 import { messagingOperations } from "../plugins/whatsapp/lib/messaging-schema.js";
-import { createMessaging } from "../plugins/whatsapp/lib/messaging.js";
+import { createMessaging, message } from "../plugins/whatsapp/lib/messaging.js";
 const ajv = new Ajv({ strict: false });
 async function invoke(f, name, input, ctx = f.invocation()) {
   const op = f.service.contracts.operations[name];
@@ -375,4 +375,10 @@ test("a helper without the feed extension fails native watch explicitly and leav
     "Hello",
   );
   assert.equal(f.helper.listeners.size, 0);
+});
+
+test("cached reactions preserve unknown totals and own state",()=>{
+ const reactions=[{emoji:"👍",count:null,me:true},{emoji:"❤️",count:null,me:null}];
+ assert.deepEqual(message({id:"A",chat,sender:chat,type:"text",text:"Hi",fromMe:false,timestamp:1,reactions}).reactions,reactions);
+ assert.deepEqual(message({id:"A",chat,sender:chat,type:"text",text:"Hi",fromMe:false,timestamp:1,reactions:[]}).reactions,[]);
 });

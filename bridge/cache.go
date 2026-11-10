@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"regexp"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -30,18 +31,25 @@ type poll struct {
 	Options         []string `json:"options"`
 	SelectableCount int      `json:"selectableCount"`
 }
+type reaction struct {
+	Emoji string `json:"emoji"`
+	Count *int   `json:"count"`
+	Me    *bool  `json:"me"`
+}
+
 type message struct {
-	Chat              string `json:"chat"`
-	ID                string `json:"id"`
-	Sender            string `json:"sender"`
-	AuthorDisplayName string `json:"authorDisplayName,omitempty"`
-	FromMe            bool   `json:"fromMe"`
-	Timestamp         int64  `json:"timestamp"`
-	Text              string `json:"text"`
-	Type              string `json:"type"`
-	ReplyTo           string `json:"replyTo,omitempty"`
-	Poll              *poll  `json:"poll,omitempty"`
-	Truncated         bool   `json:"textTruncated,omitempty"`
+	Chat              string     `json:"chat"`
+	ID                string     `json:"id"`
+	Sender            string     `json:"sender"`
+	AuthorDisplayName string     `json:"authorDisplayName,omitempty"`
+	FromMe            bool       `json:"fromMe"`
+	Timestamp         int64      `json:"timestamp"`
+	Text              string     `json:"text"`
+	Type              string     `json:"type"`
+	ReplyTo           string     `json:"replyTo,omitempty"`
+	Poll              *poll      `json:"poll,omitempty"`
+	Truncated         bool       `json:"textTruncated,omitempty"`
+	Reactions         []reaction `json:"reactions"`
 	raw               []byte
 	revision          int64
 }
@@ -232,6 +240,40 @@ const aliasMessages = `WITH ranked AS (
  FROM sb_messages WHERE chat IN (?,?)
 ) SELECT ` + columns + ` FROM ranked WHERE rank=1`
 
+// History is only a partial synced cache: counts and unobserved own state
+// remain unknown. Empty reaction text is a removal and wins by timestamp.
+func (a *app) messageReactions(chat, alias, id string) ([]reaction, error) {
+	rows, err := a.db.Query(`WITH ranked AS (SELECT text,from_me,row_number() OVER (PARTITION BY CASE WHEN from_me=1 THEN '__self__' ELSE sender END ORDER BY revision DESC,id DESC) AS n FROM sb_messages WHERE chat IN (?,?) AND kind='reaction' AND reply_to=?) SELECT text,from_me FROM ranked WHERE n=1 AND text!=''`, chat, alias, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	found := map[string]*reaction{}
+	for rows.Next() {
+		var emoji string
+		var own bool
+		if err = rows.Scan(&emoji, &own); err != nil {
+			return nil, err
+		}
+		if found[emoji] == nil {
+			found[emoji] = &reaction{Emoji: emoji}
+		}
+		if own {
+			v := true
+			found[emoji].Me = &v
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	result := make([]reaction, 0, len(found))
+	for _, v := range found {
+		result = append(result, *v)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Emoji < result[j].Emoji })
+	return result, nil
+}
+
 func (a *app) getMessage(chat, id string) (message, error) {
 	if _, err := parseChat(chat); err != nil {
 		return message{}, err
@@ -246,6 +288,7 @@ func (a *app) getMessage(chat, id string) (message, error) {
 	m, err := scanMessage(a.db.QueryRow(aliasMessages+" AND id=?", chat, alias, id))
 	if err == nil {
 		m.AuthorDisplayName = a.senderName(m.Sender)
+		m.Reactions, err = a.messageReactions(chat, alias, id)
 	}
 	return m, err
 }
@@ -327,6 +370,10 @@ func (a *app) messages(in args) (any, error) {
 	}
 	for i := range items {
 		items[i].AuthorDisplayName = a.senderName(items[i].Sender)
+		items[i].Reactions, err = a.messageReactions(in.Chat, alias, items[i].ID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var next any
 	if len(items) > n {

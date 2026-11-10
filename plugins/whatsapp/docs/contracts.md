@@ -29,7 +29,7 @@ the final page. A cache miss is not a global deletion. Phone-number and LID alia
 are not merged. Hidden/restricted/deleted and truncated bodies are not represented
 as complete text. Unknown unread/author/ownership/time metadata remains null. Poll
 names and media captions are text fallbacks; this API does not transfer media files
-or expand poll totals/reaction collections.
+or expand poll totals. Reactions are reconstructed from synced reaction events; counts and an unobserved own reaction remain unknown because the cache is partial.
 
 Sends accept up to 4000 UTF-16 code units. Core intent keys are namespaced into the
 existing durable profile/account ledger. Accepted writes replay the same receipt;
