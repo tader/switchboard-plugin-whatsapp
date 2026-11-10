@@ -197,6 +197,8 @@ try {
     await call("messaging.messages.list", { conversationId: chat })
   ).json();
   assert.equal(snapshot.coverage.complete, false);
+  assert.deepEqual(snapshot.items[0].reactions[0].users,[{id:chat,displayName:"Fixture contact"}]);
+  assert.equal(snapshot.items[0].reactions[0].usersComplete,false);
   assert.equal(snapshot.items[1].text, null);
   assert.equal(snapshot.items[1].contentState, "restricted");
   assert.equal(snapshot.items[2].text, null);

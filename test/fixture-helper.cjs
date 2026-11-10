@@ -14,7 +14,7 @@ function ingest(id,text,extra={}){
 }
 if(!db.prepare('SELECT 1 FROM state WHERE id=1').get()){
  db.prepare('INSERT INTO state VALUES(1,?,0,0)').run(randomUUID().replaceAll('-',''));
- ingest('M1','Hello',{timestamp:1000,fromMe:true,sender:account});
+ ingest('M1','Hello',{timestamp:1000,fromMe:true,sender:account,reactions:[{emoji:'👍',count:null,me:null,users:[{id:chat,displayName:'Fixture contact'}],usersComplete:false}]});
  ingest('M2','PRIVATE-RESTRICTED',{type:'restricted',timestamp:2000});
  ingest('M3','PRIVATE-DELETED',{type:'revoked',timestamp:3000});
  ingest('M4','',{type:'audio',timestamp:4000});
