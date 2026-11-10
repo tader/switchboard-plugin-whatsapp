@@ -252,3 +252,27 @@ func TestReactionProjectionTracksNewestPerActorAndRemoval(t *testing.T) {
 		t.Fatalf("%+v %v", m.Reactions, err)
 	}
 }
+
+func TestReactionActorNamesComeFromObservedSenderAndStayPartial(t *testing.T) {
+	a := fixture(t)
+	peer, _ := types.ParseJID(testChat)
+	a.cli.Store.Contacts = &nameContacts{names: map[types.JID]types.ContactInfo{peer: {FullName: "Peer Name"}}}
+	msg := textEvent("123-456@g.us", "M", "message", 1000)
+	if err := a.ingest(msg); err != nil {
+		t.Fatal(err)
+	}
+	event := textEvent("123-456@g.us", "R", "", 2000)
+	event.Info.Sender = peer
+	event.Message = &waE2E.Message{ReactionMessage: &waE2E.ReactionMessage{Key: &waCommon.MessageKey{ID: proto.String("M")}, Text: proto.String("👍")}}
+	if err := a.ingest(event); err != nil {
+		t.Fatal(err)
+	}
+	m, err := a.getMessage("123-456@g.us", "M")
+	if err != nil || len(m.Reactions) != 1 || len(m.Reactions[0].Users) != 1 {
+		t.Fatal(m, err)
+	}
+	r := m.Reactions[0]
+	if r.UsersComplete || r.Count != nil || r.Users[0].ID != peer.String() || r.Users[0].DisplayName == nil || *r.Users[0].DisplayName != "Peer Name" {
+		t.Fatal(r)
+	}
+}

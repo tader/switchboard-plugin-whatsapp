@@ -32,9 +32,15 @@ type poll struct {
 	SelectableCount int      `json:"selectableCount"`
 }
 type reaction struct {
-	Emoji string `json:"emoji"`
-	Count *int   `json:"count"`
-	Me    *bool  `json:"me"`
+	Emoji         string         `json:"emoji"`
+	Count         *int           `json:"count"`
+	Me            *bool          `json:"me"`
+	Users         []reactionUser `json:"users"`
+	UsersComplete bool           `json:"usersComplete"`
+}
+type reactionUser struct {
+	ID          string  `json:"id"`
+	DisplayName *string `json:"displayName"`
 }
 
 type message struct {
@@ -243,20 +249,23 @@ const aliasMessages = `WITH ranked AS (
 // History is only a partial synced cache: counts and unobserved own state
 // remain unknown. Empty reaction text is a removal and wins by timestamp.
 func (a *app) messageReactions(chat, alias, id string) ([]reaction, error) {
-	rows, err := a.db.Query(`WITH ranked AS (SELECT text,from_me,row_number() OVER (PARTITION BY CASE WHEN from_me=1 THEN '__self__' ELSE sender END ORDER BY revision DESC,id DESC) AS n FROM sb_messages WHERE chat IN (?,?) AND kind='reaction' AND reply_to=?) SELECT text,from_me FROM ranked WHERE n=1 AND text!=''`, chat, alias, id)
+	rows, err := a.db.Query(`WITH ranked AS (SELECT text,from_me,sender,row_number() OVER (PARTITION BY CASE WHEN from_me=1 THEN '__self__' ELSE sender END ORDER BY revision DESC,id DESC) AS n FROM sb_messages WHERE chat IN (?,?) AND kind='reaction' AND reply_to=?) SELECT text,from_me,sender FROM ranked WHERE n=1 AND text!=''`, chat, alias, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	found := map[string]*reaction{}
 	for rows.Next() {
-		var emoji string
+		var emoji, sender string
 		var own bool
-		if err = rows.Scan(&emoji, &own); err != nil {
+		if err = rows.Scan(&emoji, &own, &sender); err != nil {
 			return nil, err
 		}
 		if found[emoji] == nil {
-			found[emoji] = &reaction{Emoji: emoji}
+			found[emoji] = &reaction{Emoji: emoji, Users: []reactionUser{}}
+		}
+		if sender != "" && len(sender) <= 2048 && len(found[emoji].Users) < 100 {
+			found[emoji].Users = append(found[emoji].Users, reactionUser{ID: sender})
 		}
 		if own {
 			v := true
@@ -266,8 +275,18 @@ func (a *app) messageReactions(chat, alias, id string) ([]reaction, error) {
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
+	// Name resolution can access the same single-connection database.
+	if err = rows.Close(); err != nil {
+		return nil, err
+	}
 	result := make([]reaction, 0, len(found))
 	for _, v := range found {
+		for i := range v.Users {
+			name := a.senderName(v.Users[i].ID)
+			if name != "" && name != v.Users[i].ID {
+				v.Users[i].DisplayName = &name
+			}
+		}
 		result = append(result, *v)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].Emoji < result[j].Emoji })
