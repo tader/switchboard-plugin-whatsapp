@@ -88,3 +88,8 @@ page boundaries, hint serialization/coalescing, cancellation, strict schema/targ
 write replay/uncertainty, restricted content and auth recovery. They use temporary
 local device stores and offline helper fixtures. No live message or new pairing is
 created by these tests.
+# Reaction participants
+
+Reaction users are drawn from the linked account's observed message cache and
+resolved using its local contact and verified alias stores. Cached history is
+partial, so the total remains unknown and `usersComplete` remains false.
