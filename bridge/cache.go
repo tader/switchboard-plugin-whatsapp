@@ -347,7 +347,7 @@ func (a *app) messages(in args) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := a.db.Query(aliasMessages+" AND (ts<? OR (ts=? AND id<?)) ORDER BY ts DESC,id DESC LIMIT ?", in.Chat, alias, c.Time, c.Time, c.ID, n+1)
+	rows, err := a.db.Query(aliasMessages+" AND kind!='reaction' AND (ts<? OR (ts=? AND id<?)) ORDER BY ts DESC,id DESC LIMIT ?", in.Chat, alias, c.Time, c.Time, c.ID, n+1)
 	if err != nil {
 		return nil, err
 	}
