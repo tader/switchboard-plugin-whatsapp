@@ -4,13 +4,9 @@ services: [whatsapp]
 order: 3
 ---
 
-# Messaging v1 (staged)
+# Messaging v1
 
-This optional generic interface sits beside the existing WhatsApp operations. It
-requires the staged [Switchboard core](https://github.com/tader/switchboard/pull/40)
-and `SWITCHBOARD_SHARED_CONTRACTS=1`. Development installations must select a helper
-built from this revision. Released plugin/helper versions remain synchronized by
-Release Please. This change does not enable or deploy the core feature.
+Enable shared contracts on Switchboard to access the messaging operations with an existing connection.
 
 Common operations are conversation list/get, message list/get, message send with
 optional quoted reply, and reaction update/removal. A read-only binding advertises
@@ -83,12 +79,9 @@ pairing codes or QR material. Existing durable write identities remain unchanged
 
 A helper without the feed feature fails native watching explicitly; normal legacy
 calls remain available. A cache failure is reported instead of acknowledging a lost
-publication. Tests exercise rollback, duplicate suppression, restart, retention,
-page boundaries, hint serialization/coalescing, cancellation, strict schema/targets,
-write replay/uncertainty, restricted content and auth recovery. They use temporary
-local device stores and offline helper fixtures. No live message or new pairing is
-created by these tests.
-# Reaction participants
+publication.
+
+## Reaction participants
 
 Reaction users are drawn from the linked account's observed message cache and
 resolved using its local contact and verified alias stores. Cached history is
