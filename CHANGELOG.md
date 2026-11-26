@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.3.2...v1.4.0) (2026-11-26)
+
+
+### Features
+
+* preview WhatsApp history coverage in activity ([#23](https://github.com/tader/switchboard-plugin-whatsapp/issues/23)) ([5db04e7](https://github.com/tader/switchboard-plugin-whatsapp/commit/5db04e7bd459611c1096b78c806ceab5bc953974))
+
 ## [1.3.2](https://github.com/tader/switchboard-plugin-whatsapp/compare/v1.3.1...v1.3.2) (2026-11-10)
 
 
