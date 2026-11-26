@@ -235,7 +235,16 @@ export interface AuthMethod {
   revoke?(conn: Connection): Promise<void>;
 }
 
+export interface OutputPreviewRule {
+  origin: string;
+  method: "GET";
+  path: string;
+  authMethods: string[];
+  fields: Record<string, { maxBytes: number }>;
+}
+
 export interface ServiceDefinition {
+  outputPreviews?: OutputPreviewRule[];
   /** Optional provider-independent contract, alongside existing APIs. */
   contracts?: ContractDefinition;
   /** Omitted by existing plugins; defaults to HTTP. */
