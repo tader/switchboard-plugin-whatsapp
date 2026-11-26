@@ -32,6 +32,19 @@ Phone history sync and incoming events populate a local cache. It is **not a com
 
 Writes require an idempotency key. Accepted writes replay their receipt; conflicting content and uncertain outcomes do not resend. Reading, replying, reacting and voting never automatically send read receipts. [API examples and recovery](plugins/whatsapp/docs/operations.md).
 
+## Activity response previews
+
+With preview storage enabled on Switchboard 0.17.0 or later, audited
+`GET /capabilities` calls without a query can retain only the top-level
+`historyCoverage` string (up to 32 bytes). The rule applies to phone-code
+(`linked-device`) and QR (`linked-device-qr`) connections and matches the
+loopback origin allocated by that plugin instance. Pairing, chats, messages and
+bridge output have no response preview.
+
+To verify the installed-plugin fixture with preview storage, build the bridge
+and run `VERIFY_ACTIVITY_PREVIEWS=1 SWITCHBOARD_ROOT=/path/to/core npm run integration`
+against a Switchboard 0.17.0 checkout with dependencies installed.
+
 ## Local and remote use
 
 Run on your laptop or pair directly on a remote Switchboard. To access a laptop-owned connection remotely, use Switchboard's normal **Peers → Share connection** flow. Operations run on the owner; WhatsApp session keys and message cache stay there. This plugin deliberately does not export a linked-device session as an authentication source. A session must not be opened concurrently by two Switchboard instances.

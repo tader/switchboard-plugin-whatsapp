@@ -123,6 +123,13 @@ export async function createAdapter(ctx, { pool = new Pool(ctx) } = {}) {
         icon: "icon.svg",
         baseUrl: "http://whatsapp.localhost",
         allowedHosts: ["whatsapp.localhost", origin.host],
+        outputPreviews: [{
+          origin: origin.origin,
+          method: "GET",
+          path: "/capabilities",
+          authMethods: ["linked-device", "linked-device-qr"],
+          fields: { historyCoverage: { maxBytes: 32 } },
+        }],
         openapi,
         contracts: createMessaging(ctx.dataDir, pool, auth),
         authMethods: auth.methods.map(method => ({
